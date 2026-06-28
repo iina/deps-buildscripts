@@ -16,8 +16,6 @@ build_for_arch() {
     log_step "=== ${DEP_NAME} ${VERSION} — ${arch} ==="
     setup_arch_env "$arch"
 
-    # ffmpeg was built as static libs; tell pkg-config to expose their private
-    # dependencies so the linker pulls in all transitive static-lib flags.
     export PKG_CONFIG_PATH="${prefix}/lib/pkgconfig"
     export PKG_CONFIG="${PKG_CONFIG:-pkg-config}"
 
@@ -35,7 +33,9 @@ build_for_arch() {
         -Dlibarchive=enabled \
         -Duchardet=enabled \
         -Djpeg=enabled \
-        -Dswift-build=disabled \
+        -Dmacos-cocoa-cb=disabled \
+        -Dmacos-touchbar=disabled \
+        -Dmacos-media-player=disabled \
         -Dtests=false
 
     ninja -C "$build_dir" -j"$JOBS"
