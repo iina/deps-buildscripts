@@ -25,8 +25,6 @@ build_for_arch() {
         cross_compile_flag="--enable-cross-compile"
     fi
 
-    # ffmpeg has its own configure; does not use autoconf --host conventions.
-    # --enable-pic is required so static archives can be linked into libmpv.dylib.
     "${SRC_DIR}/configure" \
         --prefix="$prefix" \
         --arch="${arch}" \
@@ -36,10 +34,8 @@ build_for_arch() {
         --extra-cflags="${CFLAGS}" \
         --extra-ldflags="${LDFLAGS}" \
         --pkg-config=pkg-config \
-        --pkg-config-flags="--static" \
-        --disable-shared \
-        --enable-static \
-        --enable-pic \
+        --enable-shared \
+        --disable-static \
         --disable-programs \
         --disable-doc \
         --disable-debug \
@@ -76,6 +72,4 @@ extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done
-# ffmpeg is built as static libs; no dylibs to lipo. The static archives
-# will be linked into libmpv.dylib during the mpv build.
-log_step "ffmpeg: static build — no lipo step (archives baked into libmpv)"
+lipo_merge "$DEP_NAME"

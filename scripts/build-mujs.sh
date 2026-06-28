@@ -20,12 +20,16 @@ build_for_arch() {
     rm -rf "$src_dir"
     cp -R "$SRC_DIR" "$src_dir"
 
-    # mujs only builds a static lib; mpv links it statically into libmpv.dylib
     make -C "$src_dir" -j"$JOBS" \
         CC=clang \
         CFLAGS="${CFLAGS}" \
+        LDFLAGS="${LDFLAGS}" \
         prefix="$prefix" \
-        install-static
+        release
+
+    make -C "$src_dir" prefix="$prefix" install
+    make -C "$src_dir" prefix="$prefix" install-shared
+    rm -f "${prefix}/lib/libmujs.a"
 }
 
 download_and_verify "$MUJS_URL" "$MUJS_SHA256" "$TARBALL"
@@ -33,5 +37,4 @@ extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done
-# mujs is static-only — no dylibs to lipo; header is architecture-independent
-log_step "mujs: static library only — no lipo needed"
+lipo_merge "$DEP_NAME"
