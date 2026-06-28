@@ -19,12 +19,10 @@ jobs:
     name: Build (arm64)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install build tools
-        run: |
-          brew install nasm ninja cmake pkg-config
-          pip3 install meson --break-system-packages
+        run: brew install nasm meson autoconf automake
 
       - name: Build dependencies
         run: bash build.sh arm64
@@ -44,7 +42,7 @@ jobs:
           done
 
       - name: Upload arm64 artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deps-arm64
           path: install/arm64/
@@ -58,12 +56,10 @@ jobs:
     name: Build (x86_64)
     runs-on: macos-13
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install build tools
-        run: |
-          brew install nasm ninja cmake pkg-config
-          pip3 install meson --break-system-packages
+        run: brew install nasm meson autoconf automake
 
       - name: Build dependencies
         run: bash build.sh x86_64
@@ -83,7 +79,7 @@ jobs:
           done
 
       - name: Upload x86_64 artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deps-x86_64
           path: install/x86_64/
@@ -96,16 +92,16 @@ jobs:
     needs: [build-arm64, build-x86_64]
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: deps-arm64
           path: install/arm64/
 
       - name: Download x86_64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: deps-x86_64
           path: install/x86_64/
@@ -128,7 +124,7 @@ jobs:
         run: tar czf iina-deps-universal.tar.gz -C output .
 
       - name: Upload universal artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: iina-deps-universal
           path: iina-deps-universal.tar.gz

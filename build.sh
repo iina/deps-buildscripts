@@ -1,5 +1,7 @@
 #!/bin/bash
-set -euo pipefail
+# -e is intentionally omitted: run_build catches failures individually so all
+# scripts run even when some fail, giving a full picture in one CI run.
+set -uo pipefail
 
 cd "$(dirname "$0")"
 source config.env
@@ -25,17 +27,18 @@ fi
 check_tool() {
     command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not found. Install with: $2" >&2; exit 1; }
 }
-check_tool meson  "pip3 install meson --break-system-packages"
-check_tool ninja  "brew install ninja"
-check_tool nasm   "brew install nasm"
-check_tool cmake  "brew install cmake"
+check_tool meson      "brew install meson"
+check_tool ninja      "brew install ninja"
+check_tool nasm       "brew install nasm"
+check_tool cmake      "brew install cmake"
 check_tool pkg-config "brew install pkg-config"
-check_tool python3 "xcode-select --install"
 
 # ---------------------------------------------------------------------------
 # Create directory tree
 # ---------------------------------------------------------------------------
 mkdir -p "$SOURCES_DIR" "$BUILD_DIR" "$OUTPUT_DIR"
+LOG_DIR="${BUILD_DIR}/logs"
+mkdir -p "$LOG_DIR"
 for arch in $ARCHS; do
     mkdir -p "${INSTALL_DIR}/${arch}"
 done
@@ -44,20 +47,33 @@ done
 # Build helpers
 # ---------------------------------------------------------------------------
 
-# run_build <script-name>
-# Runs scripts/<script-name> if it exists; prints a skip message otherwise.
-# This allows incremental development: add a script file to enable a dep.
-run_build() {
-    local script="scripts/$1"
-    if [ -f "$script" ]; then
-        bash "$script"
-    else
-        log_step "SKIP: ${script} (not yet implemented)"
-    fi
-}
+FAILED_BUILDS=()
+FAILED_LOGS=()
 
 log_step() {
     echo "[$(date '+%H:%M:%S')] $*" >&2
+}
+
+# run_build <script-name>
+# Tees script output to a per-script log file while streaming it live.
+# On failure, the log path is saved so errors can be replayed at the end.
+run_build() {
+    local name="$1"
+    local script="scripts/${name}"
+    local log="${LOG_DIR}/${name}.log"
+
+    if [ ! -f "$script" ]; then
+        log_step "SKIP: ${name} (not yet implemented)"
+        return
+    fi
+
+    if bash "$script" 2>&1 | tee "$log"; then
+        log_step "OK: ${name}"
+    else
+        log_step "FAILED: ${name}"
+        FAILED_BUILDS+=("${name}")
+        FAILED_LOGS+=("${log}")
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -101,6 +117,31 @@ run_build build-mpv.sh              # depends on everything above
 # ---------------------------------------------------------------------------
 if [ "$ARCH_FILTER" = "all" ]; then
     bash scripts/create-universal.sh
+fi
+
+# ---------------------------------------------------------------------------
+# Final report — replay the tail of every failed script's log
+# ---------------------------------------------------------------------------
+if [ ${#FAILED_BUILDS[@]} -gt 0 ]; then
+    echo "" >&2
+    echo "################################################################" >&2
+    echo "# FAILED BUILDS (${#FAILED_BUILDS[@]}):" >&2
+    printf '#   - %s\n' "${FAILED_BUILDS[@]}" >&2
+    echo "################################################################" >&2
+
+    for i in "${!FAILED_BUILDS[@]}"; do
+        echo "" >&2
+        echo "================================================================" >&2
+        echo "  ERROR LOG: ${FAILED_BUILDS[$i]}" >&2
+        echo "================================================================" >&2
+        tail -80 "${FAILED_LOGS[$i]}" >&2
+    done
+
+    echo "" >&2
+    echo "################################################################" >&2
+    echo "# END OF ERROR SUMMARY" >&2
+    echo "################################################################" >&2
+    exit 1
 fi
 
 echo "Build complete. Output in ${OUTPUT_DIR}/"

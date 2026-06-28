@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+
+DEP_NAME="fribidi"
+VERSION="${FRIBIDI_VERSION}"
+TARBALL="${DEP_NAME}-${VERSION}.tar.xz"
+SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
+
+build_for_arch() {
+    local arch="$1"
+    local build_dir
+    build_dir="$(get_build_dir "$DEP_NAME" "$arch")"
+
+    log_step "=== ${DEP_NAME} ${VERSION} — ${arch} ==="
+    setup_arch_env "$arch"
+
+    meson_setup "$build_dir" "$SRC_DIR" "$arch" \
+        -Ddocs=false \
+        -Dtests=false
+
+    ninja -C "$build_dir" -j"$JOBS"
+    ninja -C "$build_dir" install
+}
+
+download_and_verify "$FRIBIDI_URL" "$FRIBIDI_SHA256" "$TARBALL"
+extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
+apply_patches "$DEP_NAME" "$SRC_DIR"
+
+for arch in $ARCHS; do build_for_arch "$arch"; done
+lipo_merge "$DEP_NAME"

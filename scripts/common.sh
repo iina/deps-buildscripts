@@ -217,3 +217,70 @@ lipo_merge() {
         ln -sf "$target" "${OUTPUT_DIR}/lib/${linkname}" 2>/dev/null || true
     done
 }
+
+# ---------------------------------------------------------------------------
+# Meson build helper
+# ---------------------------------------------------------------------------
+
+# meson_setup <build_dir> <src_dir> <arch> [extra meson args...]
+# Selects --native-file vs --cross-file based on whether arch == host arch,
+# clears CFLAGS/LDFLAGS so they don't duplicate the machine-file c_args,
+# and sets PKG_CONFIG_PATH for the target prefix.
+meson_setup() {
+    local build_dir="$1" src_dir="$2" arch="$3"
+    shift 3
+    local prefix
+    prefix="$(get_prefix "$arch")"
+    local machine_file="${ROOT_DIR}/cross/meson-${arch}-darwin.ini"
+    local native_arch
+    native_arch="$(uname -m)"
+
+    local machine_flag
+    if [ "$arch" = "$native_arch" ]; then
+        machine_flag="--native-file=${machine_file}"
+    else
+        machine_flag="--cross-file=${machine_file}"
+    fi
+
+    rm -rf "$build_dir"
+
+    # Clear compiler env vars — the machine file sets -arch and -mmacosx-version-min;
+    # leaving CFLAGS/LDFLAGS would cause each flag to appear twice.
+    local _cflags="${CFLAGS:-}" _cxxflags="${CXXFLAGS:-}" _ldflags="${LDFLAGS:-}"
+    unset CFLAGS CXXFLAGS OBJCFLAGS LDFLAGS
+
+    PKG_CONFIG_PATH="${prefix}/lib/pkgconfig" \
+    meson setup "$build_dir" "$src_dir" \
+        "$machine_flag" \
+        --prefix="$prefix" \
+        --default-library=shared \
+        --buildtype=release \
+        "$@"
+
+    [ -n "$_cflags"   ] && export CFLAGS="$_cflags"
+    [ -n "$_cxxflags" ] && export CXXFLAGS="$_cxxflags"
+    [ -n "$_ldflags"  ] && export LDFLAGS="$_ldflags"
+}
+
+# ---------------------------------------------------------------------------
+# CMake build helper
+# ---------------------------------------------------------------------------
+
+# cmake_configure <build_dir> <src_dir> <arch> [extra cmake args...]
+cmake_configure() {
+    local build_dir="$1" src_dir="$2" arch="$3"
+    shift 3
+    local prefix
+    prefix="$(get_prefix "$arch")"
+
+    rm -rf "$build_dir"
+    cmake -S "$src_dir" -B "$build_dir" \
+        -DCMAKE_INSTALL_PREFIX="$prefix" \
+        -DCMAKE_PREFIX_PATH="$prefix" \
+        -DCMAKE_OSX_ARCHITECTURES="$arch" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
+        -DCMAKE_OSX_SYSROOT="$MACOS_SDK" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        "$@"
+}
