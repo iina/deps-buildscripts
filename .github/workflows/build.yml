@@ -43,13 +43,29 @@ jobs:
             echo "--- $(basename "$f") ---"
             lipo -info "$f"
             lipo -info "$f" | grep -q "arm64" || { echo "FAIL: missing arm64"; exit 1; }
+            vtool -show-build "$f"
+            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+          done
+
+      - name: Stage arm64 artifacts
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          for f in install/arm64/lib/*.dylib; do
+            [ -L "$f" ] && continue
+            cp "$f" artifacts/lib/
+          done
+          cp -r install/arm64/include/mpv artifacts/include/ 2>/dev/null || true
+          for d in install/arm64/include/libav* \
+                   install/arm64/include/libsw* \
+                   install/arm64/include/libpost*; do
+            [ -d "$d" ] && cp -r "$d" artifacts/include/
           done
 
       - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v5
         with:
           name: deps-arm64
-          path: install/arm64/
+          path: artifacts/
 
   # ---------------------------------------------------------------------------
   # Build on Intel (x86_64)
@@ -79,13 +95,29 @@ jobs:
             echo "--- $(basename "$f") ---"
             lipo -info "$f"
             lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
+            vtool -show-build "$f"
+            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+          done
+
+      - name: Stage x86_64 artifacts
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          for f in install/x86_64/lib/*.dylib; do
+            [ -L "$f" ] && continue
+            cp "$f" artifacts/lib/
+          done
+          cp -r install/x86_64/include/mpv artifacts/include/ 2>/dev/null || true
+          for d in install/x86_64/include/libav* \
+                   install/x86_64/include/libsw* \
+                   install/x86_64/include/libpost*; do
+            [ -d "$d" ] && cp -r "$d" artifacts/include/
           done
 
       - name: Upload x86_64 artifacts
         uses: actions/upload-artifact@v5
         with:
           name: deps-x86_64
-          path: install/x86_64/
+          path: artifacts/
 
   # ---------------------------------------------------------------------------
   # Combine into universal binaries
@@ -112,6 +144,9 @@ jobs:
       - name: Create universal binaries
         run: bash scripts/create-universal.sh
 
+      - name: Fix install names
+        run: bash scripts/fix-install-names.sh
+
       - name: Verify universal binaries
         run: |
           shopt -s nullglob
@@ -121,6 +156,18 @@ jobs:
             lipo -info "$f"
             lipo -info "$f" | grep -q "arm64"  || { echo "FAIL: missing arm64";  exit 1; }
             lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
+            vtool -show-build "$f"
+            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+          done
+
+      - name: Copy headers to output
+        run: |
+          mkdir -p output/include
+          cp -r install/arm64/include/mpv output/include/ 2>/dev/null || true
+          for d in install/arm64/include/libav* \
+                   install/arm64/include/libsw* \
+                   install/arm64/include/libpost*; do
+            [ -d "$d" ] && cp -r "$d" output/include/
           done
 
       - name: Package
