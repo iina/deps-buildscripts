@@ -1,0 +1,7 @@
+sources/
+build/
+install/
+output/
+*.tar.gz
+*.tar.xz
+*.tar.bz2

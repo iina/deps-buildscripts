@@ -84,7 +84,7 @@ Layer 0 — System / Xcode SDK (no build needed):
 
 Layer 1 — Leaf libraries (no inter-dependencies among themselves):
   pkg-config  (build tool only, not shipped)
-  nasm        (build tool only, needed for dav1d/x264 asm)
+  nasm        (build tool only, needed for dav1d asm)
   meson       (build tool only, via pip)
   ninja       (build tool only)
   freetype    (autotools/meson, no deps beyond zlib)
@@ -95,17 +95,21 @@ Layer 1 — Leaf libraries (no inter-dependencies among themselves):
   dav1d       (meson + nasm, no deps)
   libvorbis   (autotools, depends on libogg)
   libogg      (autotools, no deps)
-  opus         (autotools/meson, no deps)
+  opus        (autotools/meson, no deps)
+  jpeg-turbo  (cmake, no deps — needed by mpv for JPEG screenshot output)
+  little-cms2 (autotools, no deps — ICC color profile support for mpv and libplacebo)
+  mujs        (makefile, no deps — JavaScript scripting support for mpv)
+  libudfread  (autotools, no deps — UDF filesystem layer required by libbluray)
+  lz4         (cmake, no deps — LZ4 compression support for libarchive)
+  zstd        (cmake, no deps — Zstandard compression support for libarchive)
+  zimg          (autotools, no deps — high-quality image scaling used by mpv's zscale filter)
 
 Layer 2 — Libraries with Layer 1 deps:
   harfbuzz    (meson; depends on freetype, optionally ICU)
   fontconfig  (meson; depends on freetype, optionally expat/libxml2)
-  vulkan-headers     (cmake, headers only — no library built)
-  vulkan-loader      (cmake; depends on vulkan-headers)
-  MoltenVK           (download prebuilt from LunarG SDK — don't compile)
-  libplacebo (meson; depends on vulkan-headers, optionally shaderc/glslang)
-  libbluray  (autotools; depends on fontconfig, freetype, libxml2)
-  libarchive (cmake; depends on zlib, bzip2, libiconv — all system)
+  libplacebo  (meson; depends on little-cms2; built with OpenGL renderer, Vulkan disabled)
+  libbluray   (autotools; depends on fontconfig, freetype, libxml2, libudfread)
+  libarchive  (cmake; depends on zlib, bzip2, libiconv — system — plus lz4, zstd)
 
 Layer 3 — Core media libraries:
   libass      (meson; depends on freetype, fribidi, harfbuzz, fontconfig, libunibreak)
@@ -114,7 +118,8 @@ Layer 3 — Core media libraries:
 
 Layer 4 — mpv:
   mpv         (meson; depends on ffmpeg, libass, libplacebo, luajit,
-               libbluray, libarchive, uchardet. Build with -Dlibmpv=true)
+               libbluray, libarchive, uchardet, jpeg-turbo, little-cms2,
+               mujs, zimg. Build with -Dlibmpv=true, Vulkan disabled)
 ```
 
 ### 3.2 What IINA Actually Needs from FFmpeg
@@ -129,7 +134,7 @@ Consult `iina/homebrew-mpv-iina`'s ffmpeg formula for the exact flag set IINA ha
 
 ### 3.3 Estimated Library Count
 
-Approximately **18-22 libraries** to build, depending on optional features. This is well within the range of what a single maintainer can handle (HandBrake manages 40+).
+Approximately **22-25 libraries** to build. Vulkan and its entire dependency chain (vulkan-headers, vulkan-loader, MoltenVK, shaderc, glslang, SPIRV-Headers, SPIRV-Tools) are excluded — IINA uses mpv's OpenGL render path and never goes through Vulkan. libplacebo is built with its OpenGL renderer only.
 
 ---
 
@@ -147,22 +152,28 @@ iina-deps/
 ├── build.sh                   # Main entry point
 ├── scripts/
 │   ├── common.sh              # Shared functions (download, verify, patch, etc.)
+│   ├── build-libogg.sh
 │   ├── build-freetype.sh
 │   ├── build-fribidi.sh
-│   ├── build-harfbuzz.sh
-│   ├── build-fontconfig.sh
 │   ├── build-libunibreak.sh
-│   ├── build-libass.sh
-│   ├── build-dav1d.sh
-│   ├── build-opus.sh
-│   ├── build-libogg.sh
-│   ├── build-libvorbis.sh
 │   ├── build-luajit.sh
 │   ├── build-uchardet.sh
+│   ├── build-dav1d.sh
+│   ├── build-opus.sh
+│   ├── build-libvorbis.sh
+│   ├── build-jpeg-turbo.sh
+│   ├── build-little-cms2.sh
+│   ├── build-mujs.sh
+│   ├── build-libudfread.sh
+│   ├── build-lz4.sh
+│   ├── build-zstd.sh
+│   ├── build-zimg.sh
+│   ├── build-harfbuzz.sh
+│   ├── build-fontconfig.sh
 │   ├── build-libplacebo.sh
-│   ├── build-vulkan-headers.sh
 │   ├── build-libbluray.sh
 │   ├── build-libarchive.sh
+│   ├── build-libass.sh
 │   ├── build-ffmpeg.sh
 │   └── build-mpv.sh
 ├── patches/                   # Any macOS-specific patches, organized per-dep
@@ -220,18 +231,63 @@ HARFBUZZ_VERSION="10.1.0"
 HARFBUZZ_SHA256="..."
 HARFBUZZ_URL="https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VERSION}/harfbuzz-${HARFBUZZ_VERSION}.tar.xz"
 
-# ... (all ~20 dependencies)
+# New deps added vs original plan
+JPEG_TURBO_VERSION="3.1.0"
+JPEG_TURBO_SHA256="..."
+JPEG_TURBO_URL="https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/${JPEG_TURBO_VERSION}/libjpeg-turbo-${JPEG_TURBO_VERSION}.tar.gz"
 
-FFMPEG_VERSION="7.1.1"
-FFMPEG_SHA256="..."
+LITTLE_CMS2_VERSION="2.17"
+LITTLE_CMS2_SHA256="..."
+LITTLE_CMS2_URL="https://github.com/mm2/Little-CMS/releases/download/lcms${LITTLE_CMS2_VERSION}/lcms2-${LITTLE_CMS2_VERSION}.tar.gz"
+
+MUJS_VERSION="1.3.6"
+MUJS_SHA256="..."
+MUJS_URL="https://mujs.com/downloads/mujs-${MUJS_VERSION}.tar.gz"
+
+LIBUDFREAD_VERSION="0.2.3"
+LIBUDFREAD_SHA256="..."
+LIBUDFREAD_URL="https://code.videolan.org/videolan/libudfread/-/archive/${LIBUDFREAD_VERSION}/libudfread-${LIBUDFREAD_VERSION}.tar.gz"
+
+LZ4_VERSION="1.10.0"
+LZ4_SHA256="..."
+LZ4_URL="https://github.com/lz4/lz4/releases/download/v${LZ4_VERSION}/lz4-${LZ4_VERSION}.tar.gz"
+
+ZSTD_VERSION="1.5.7"
+ZSTD_SHA256="..."
+ZSTD_URL="https://github.com/facebook/zstd/releases/download/v${ZSTD_VERSION}/zstd-${ZSTD_VERSION}.tar.gz"
+
+SPIRV_HEADERS_VERSION="1.4.309.0"
+SPIRV_HEADERS_SHA256="..."
+SPIRV_HEADERS_URL="https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-${SPIRV_HEADERS_VERSION}.tar.gz"
+
+SPIRV_TOOLS_VERSION="2024.4.rc2"
+SPIRV_TOOLS_SHA256="..."
+SPIRV_TOOLS_URL="https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/v${SPIRV_TOOLS_VERSION}.tar.gz"
+
+GLSLANG_VERSION="15.3.0"
+GLSLANG_SHA256="..."
+GLSLANG_URL="https://github.com/KhronosGroup/glslang/archive/refs/tags/${GLSLANG_VERSION}.tar.gz"
+
+SHADERC_VERSION="2024.4"
+SHADERC_SHA256="..."
+SHADERC_URL="https://github.com/google/shaderc/archive/refs/tags/v${SHADERC_VERSION}.tar.gz"
+
+ZIMG_VERSION="3.0.5"
+ZIMG_SHA256="..."
+ZIMG_URL="https://github.com/sekrit-twc/zimg/archive/refs/tags/release-${ZIMG_VERSION}.tar.gz"
+
+# ... (all other dependencies)
+
+FFMPEG_VERSION="8.1.2"
+FFMPEG_SHA256="464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 
-MPV_VERSION="0.39.0"
-MPV_SHA256="..."
+MPV_VERSION="0.41.0"
+MPV_SHA256="ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209"
 MPV_URL="https://github.com/mpv-player/mpv/archive/refs/tags/v${MPV_VERSION}.tar.gz"
 ```
 
-**To populate these values:** For each dependency, go to its official release page, find the latest stable release tarball URL, and compute `sha256sum`. The agent should web-search for each project's release page and fetch the latest version.
+**To populate these values:** For each dependency, go to its official release page, find the latest stable release tarball URL, and compute `sha256sum`. FFmpeg and mpv SHA256s above are taken from the Homebrew formula and can be trusted. All others marked `"..."` must be computed at implementation time. The SPIRV-Tools version string format (`vX.Y.rc`) is irregular — verify the exact tag on GitHub before pinning.
 
 ### Phase 2: Core Build Infrastructure
 
@@ -429,15 +485,21 @@ bash scripts/build-luajit.sh
 bash scripts/build-uchardet.sh
 bash scripts/build-dav1d.sh
 bash scripts/build-opus.sh
+bash scripts/build-jpeg-turbo.sh
+bash scripts/build-little-cms2.sh
+bash scripts/build-mujs.sh
+bash scripts/build-libudfread.sh
+bash scripts/build-lz4.sh
+bash scripts/build-zstd.sh
+bash scripts/build-zimg.sh
 
 # Layer 2 (depend on Layer 1)
 bash scripts/build-libvorbis.sh    # depends on libogg
 bash scripts/build-harfbuzz.sh     # depends on freetype
 bash scripts/build-fontconfig.sh   # depends on freetype
-bash scripts/build-vulkan-headers.sh
-bash scripts/build-libplacebo.sh   # depends on vulkan-headers
-bash scripts/build-libbluray.sh    # depends on fontconfig, freetype
-bash scripts/build-libarchive.sh
+bash scripts/build-libplacebo.sh   # depends on little-cms2; built without Vulkan
+bash scripts/build-libbluray.sh    # depends on fontconfig, freetype, libudfread
+bash scripts/build-libarchive.sh   # depends on lz4, zstd (plus system zlib/bzip2/libiconv)
 
 # Layer 3 (depend on Layer 1+2)
 bash scripts/build-libass.sh       # depends on freetype, fribidi, harfbuzz, fontconfig, libunibreak
@@ -501,7 +563,9 @@ These two are the most complex and most critical builds.
 
 **Step 3.1 — FFmpeg build script**
 
-The FFmpeg configure command is the heart of the build. Study `iina/homebrew-mpv-iina`'s ffmpeg formula to get the right flags. Key considerations:
+FFmpeg 8.x is the current target. The configure flags below are appropriate for 8.x; verify against `./configure --help` if a flag is rejected (8.x removed some flags present in 7.x, e.g. `--enable-neon` is now auto-detected and should be omitted).
+
+**TLS strategy:** Use `--enable-securetransport` to use macOS's native Security.framework for HTTPS streams — no OpenSSL dependency needed. If securetransport proves insufficient (e.g. specific protocol support missing), the fallback is to add `openssl@3` as a dep and switch to `--enable-openssl`.
 
 ```bash
 ./configure \
@@ -515,19 +579,19 @@ The FFmpeg configure command is the heart of the build. Study `iina/homebrew-mpv
     --enable-pthreads \
     --enable-videotoolbox \
     --enable-audiotoolbox \
+    --enable-securetransport \
     --enable-libdav1d \
     --enable-libvorbis \
     --enable-libopus \
     --arch="$arch" \
     --extra-cflags="-arch ${arch} -mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}" \
     --extra-ldflags="-arch ${arch} -mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}" \
-    --pkg-config-flags="--static" \
     --cc=clang \
     --enable-cross-compile \
     --target-os=darwin
 ```
 
-**Critical cross-compilation note for ffmpeg:** When building x86_64 on an arm64 host, ffmpeg needs `--enable-cross-compile --arch=x86_64 --target-os=darwin`, and you should set `--sysroot` to the macOS SDK path (`xcrun --show-sdk-path`).
+**Critical cross-compilation note for ffmpeg:** When building x86_64 on an arm64 host, ffmpeg needs `--enable-cross-compile --arch=x86_64 --target-os=darwin`, and you should set `--sysroot` to the macOS SDK path (`xcrun --show-sdk-path`). Note: `--pkg-config-flags="--static"` was removed from the flags above — it caused pkg-config to return static lib paths which then broke shared linking in ffmpeg 8.x.
 
 **Step 3.2 — mpv build script**
 
@@ -546,16 +610,21 @@ meson setup "$build_dir" "$src_dir" \
     -Dvideotoolbox-gl=enabled \
     -Dswift-build=disabled \
     -Dlua=luajit \
+    -Djavascript=enabled \
     -Dlibbluray=enabled \
     -Dlibarchive=enabled \
     -Duchardet=enabled \
+    -Dlcms2=enabled \
+    -Dvulkan=disabled \
     -Dvapoursynth=disabled \
     -Drubberband=disabled \
     -Dmanpage-build=disabled \
     -Dtests=false
 ```
 
-The `-Dcplayer=false` flag skips building the mpv binary (IINA only needs libmpv). The `-Dswift-build=disabled` avoids Swift interop in the library (IINA has its own Swift wrappers).
+The `-Dcplayer=false` flag skips building the mpv binary (IINA only needs libmpv). The `-Dswift-build=disabled` avoids Swift interop in the library (IINA has its own Swift wrappers). `-Djavascript=enabled` requires mujs; `-Dlcms2=enabled` requires little-cms2; `-Dvulkan=disabled` removes the entire Vulkan render path — IINA uses the OpenGL or Metal render path instead.
+
+**Note on option names for mpv 0.41.0:** Some option names may differ from earlier releases. Verify with `meson configure` output if any flag is rejected. In particular, `-Dvideotoolbox-gl` may be renamed in 0.41.x — check mpv's `meson_options.txt` in the source tree.
 
 **Critical:** mpv's meson.build may need symlinks to find libplacebo and libavutil headers when cross-compiling. See the `eko5624/mpv-mac` workaround:
 
@@ -835,7 +904,7 @@ These are the most disruptive events (happens ~1-2 times per year per project):
 | Phase | Estimated Time | Notes |
 |-------|---------------|-------|
 | Phase 1: Scaffolding | 2-3 hours | Repo structure, env files, common.sh |
-| Phase 2: Build scripts (Layer 1-2 deps) | 4-6 hours | ~12 scripts, each 30-60 lines |
+| Phase 2: Build scripts (Layer 1-2 deps) | 6-8 hours | ~22 scripts, each 30-60 lines; SPIRV/shaderc chain adds complexity |
 | Phase 3: FFmpeg + mpv | 3-4 hours | Most complex configure flags, cross-compile edge cases |
 | Phase 4: CI setup | 2-3 hours | GitHub Actions workflow, artifact passing, verification |
 | Phase 5: Integration + testing | 2-3 hours | Test with actual IINA build, verify on macOS 11+ |

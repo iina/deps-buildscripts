@@ -1,0 +1,134 @@
+name: Build IINA Dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'versions.env'
+      - 'config.env'
+      - 'build.sh'
+      - 'scripts/**'
+      - 'patches/**'
+      - '.github/workflows/build.yml'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build on Apple Silicon (arm64)
+  # ---------------------------------------------------------------------------
+  build-arm64:
+    name: Build (arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          brew install nasm ninja cmake pkg-config
+          pip3 install meson --break-system-packages
+
+      - name: Build dependencies
+        run: bash build.sh arm64
+
+      - name: Verify arm64 libraries
+        run: |
+          shopt -s nullglob
+          dylibs=(install/arm64/lib/*.dylib)
+          if [ ${#dylibs[@]} -eq 0 ]; then
+            echo "ERROR: No dylibs found in install/arm64/lib/" && exit 1
+          fi
+          for f in "${dylibs[@]}"; do
+            [ -L "$f" ] && continue
+            echo "--- $(basename "$f") ---"
+            lipo -info "$f"
+            lipo -info "$f" | grep -q "arm64" || { echo "FAIL: missing arm64"; exit 1; }
+          done
+
+      - name: Upload arm64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deps-arm64
+          path: install/arm64/
+
+  # ---------------------------------------------------------------------------
+  # Build on Intel (x86_64)
+  # Note: macos-13 is the last Intel runner on GitHub Actions.
+  # If GitHub retires it, switch to cross-compiling from arm64.
+  # ---------------------------------------------------------------------------
+  build-x86_64:
+    name: Build (x86_64)
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          brew install nasm ninja cmake pkg-config
+          pip3 install meson --break-system-packages
+
+      - name: Build dependencies
+        run: bash build.sh x86_64
+
+      - name: Verify x86_64 libraries
+        run: |
+          shopt -s nullglob
+          dylibs=(install/x86_64/lib/*.dylib)
+          if [ ${#dylibs[@]} -eq 0 ]; then
+            echo "ERROR: No dylibs found in install/x86_64/lib/" && exit 1
+          fi
+          for f in "${dylibs[@]}"; do
+            [ -L "$f" ] && continue
+            echo "--- $(basename "$f") ---"
+            lipo -info "$f"
+            lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
+          done
+
+      - name: Upload x86_64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deps-x86_64
+          path: install/x86_64/
+
+  # ---------------------------------------------------------------------------
+  # Combine into universal binaries
+  # ---------------------------------------------------------------------------
+  create-universal:
+    name: Create Universal Binaries
+    needs: [build-arm64, build-x86_64]
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deps-arm64
+          path: install/arm64/
+
+      - name: Download x86_64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deps-x86_64
+          path: install/x86_64/
+
+      - name: Create universal binaries
+        run: bash scripts/create-universal.sh
+
+      - name: Verify universal binaries
+        run: |
+          shopt -s nullglob
+          for f in output/lib/*.dylib; do
+            [ -L "$f" ] && continue
+            echo "--- $(basename "$f") ---"
+            lipo -info "$f"
+            lipo -info "$f" | grep -q "arm64"  || { echo "FAIL: missing arm64";  exit 1; }
+            lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
+          done
+
+      - name: Package
+        run: tar czf iina-deps-universal.tar.gz -C output .
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iina-deps-universal
+          path: iina-deps-universal.tar.gz
