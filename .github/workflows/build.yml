@@ -17,7 +17,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-arm64:
     name: Build (arm64)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
 
@@ -50,12 +50,10 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Build on Intel (x86_64)
-  # Note: macos-13 is the last Intel runner on GitHub Actions.
-  # If GitHub retires it, switch to cross-compiling from arm64.
   # ---------------------------------------------------------------------------
   build-x86_64:
     name: Build (x86_64)
-    runs-on: macos-13
+    runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v5
 
@@ -92,7 +90,7 @@ jobs:
   create-universal:
     name: Create Universal Binaries
     needs: [build-arm64, build-x86_64]
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
 

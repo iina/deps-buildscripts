@@ -9,29 +9,21 @@ SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
 
 build_for_arch() {
     local arch="$1"
-    local prefix build_dir
-    prefix="$(get_prefix "$arch")"
+    local build_dir
     build_dir="$(get_build_dir "$DEP_NAME" "$arch")"
 
     log_step "=== ${DEP_NAME} ${VERSION} — ${arch} ==="
     setup_arch_env "$arch"
 
-    rm -rf "$build_dir" && mkdir -p "$build_dir"
-    cd "$build_dir"
+    meson_setup "$build_dir" "$SRC_DIR" "$arch" \
+        -Dbdj_jar=disabled \
+        -Denable_tools=false \
+        -Denable_examples=false \
+        -Denable_devtools=false \
+        -Dlibxml2=disabled
 
-    PKG_CONFIG_PATH="${prefix}/lib/pkgconfig" \
-    "${SRC_DIR}/configure" \
-        --prefix="$prefix" \
-        --host="$HOST_TRIPLE" \
-        --enable-shared \
-        --disable-static \
-        --disable-bdjava-jar \
-        --disable-examples \
-        --disable-doxygen-doc \
-        --without-libxml2
-
-    make -j"$JOBS"
-    make install
+    ninja -C "$build_dir" -j"$JOBS"
+    ninja -C "$build_dir" install
 }
 
 download_and_verify "$LIBBLURAY_URL" "$LIBBLURAY_SHA256" "$TARBALL"

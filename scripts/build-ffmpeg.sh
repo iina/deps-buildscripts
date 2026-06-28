@@ -52,6 +52,7 @@ build_for_arch() {
         --enable-zlib \
         --enable-bzlib \
         --enable-iconv \
+        --extra-libs="-liconv" \
         --enable-libvorbis \
         --enable-libopus \
         --enable-libdav1d \

@@ -9,29 +9,21 @@ SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
 
 build_for_arch() {
     local arch="$1"
-    local prefix build_dir
-    prefix="$(get_prefix "$arch")"
+    local build_dir
     build_dir="$(get_build_dir "$DEP_NAME" "$arch")"
 
     log_step "=== ${DEP_NAME} ${VERSION} — ${arch} ==="
     setup_arch_env "$arch"
 
-    rm -rf "$build_dir" && mkdir -p "$build_dir"
-    cd "$build_dir"
+    meson_setup "$build_dir" "$SRC_DIR" "$arch" \
+        -Denable_examples=false
 
-    "${SRC_DIR}/configure" \
-        --prefix="$prefix" \
-        --host="$HOST_TRIPLE" \
-        --enable-shared \
-        --disable-static
-
-    make -j"$JOBS"
-    make install
+    ninja -C "$build_dir" -j"$JOBS"
+    ninja -C "$build_dir" install
 }
 
 download_and_verify "$LIBUDFREAD_URL" "$LIBUDFREAD_SHA256" "$TARBALL"
 extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
-( cd "$SRC_DIR" && autoreconf -fiv )
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done
