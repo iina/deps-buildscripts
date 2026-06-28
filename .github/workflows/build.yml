@@ -11,6 +11,9 @@ on:
       - 'patches/**'
       - '.github/workflows/build.yml'
 
+env:
+  HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
+
 jobs:
   # ---------------------------------------------------------------------------
   # Build on Apple Silicon (arm64)

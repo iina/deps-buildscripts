@@ -25,6 +25,7 @@ build_for_arch() {
         CFLAGS="${CFLAGS}" \
         LDFLAGS="${LDFLAGS}" \
         prefix="$prefix" \
+        VERSION="${VERSION}" \
         release
 
     make -C "$src_dir" prefix="$prefix" install
