@@ -2,14 +2,6 @@ name: Build IINA Dependencies
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'versions.env'
-      - 'config.env'
-      - 'build.sh'
-      - 'scripts/**'
-      - 'patches/**'
-      - '.github/workflows/build.yml'
 
 env:
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
@@ -49,16 +41,15 @@ jobs:
 
       - name: Stage arm64 artifacts
         run: |
+          shopt -s nullglob
           mkdir -p artifacts/lib artifacts/include
           for f in install/arm64/lib/*.dylib; do
             [ -L "$f" ] && continue
             cp "$f" artifacts/lib/
           done
-          cp -r install/arm64/include/mpv artifacts/include/ 2>/dev/null || true
-          for d in install/arm64/include/libav* \
-                   install/arm64/include/libsw* \
-                   install/arm64/include/libpost*; do
-            [ -d "$d" ] && cp -r "$d" artifacts/include/
+          [ -d install/arm64/include/mpv ] && cp -r install/arm64/include/mpv artifacts/include/ || true
+          for d in install/arm64/include/libav* install/arm64/include/libsw* install/arm64/include/libpost*; do
+            cp -r "$d" artifacts/include/
           done
 
       - name: Upload arm64 artifacts
@@ -101,16 +92,15 @@ jobs:
 
       - name: Stage x86_64 artifacts
         run: |
+          shopt -s nullglob
           mkdir -p artifacts/lib artifacts/include
           for f in install/x86_64/lib/*.dylib; do
             [ -L "$f" ] && continue
             cp "$f" artifacts/lib/
           done
-          cp -r install/x86_64/include/mpv artifacts/include/ 2>/dev/null || true
-          for d in install/x86_64/include/libav* \
-                   install/x86_64/include/libsw* \
-                   install/x86_64/include/libpost*; do
-            [ -d "$d" ] && cp -r "$d" artifacts/include/
+          [ -d install/x86_64/include/mpv ] && cp -r install/x86_64/include/mpv artifacts/include/ || true
+          for d in install/x86_64/include/libav* install/x86_64/include/libsw* install/x86_64/include/libpost*; do
+            cp -r "$d" artifacts/include/
           done
 
       - name: Upload x86_64 artifacts

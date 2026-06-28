@@ -27,11 +27,27 @@ find "$ARM64_LIB" -name "*.dylib" ! -type l | while read -r arm_lib; do
     fi
 done
 
-# Re-create dylib version symlinks
+# Re-create dylib version symlinks from the arm64 artifacts (present in local
+# builds; absent in CI where staging strips symlinks).
 find "$ARM64_LIB" -name "*.dylib" -type l | while read -r link; do
     link_name="$(basename "$link")"
     target="$(readlink "$link")"
     ln -sf "$target" "${UNIVERSAL_LIB}/${link_name}" 2>/dev/null || true
+done
+
+# For CI: staging only copies real files, so soname symlinks are missing.
+# Recreate them by reading each lipo'd file's LC_ID_DYLIB.  If the soname
+# (e.g. libavcodec.62.dylib) differs from the filename on disk
+# (e.g. libavcodec.62.28.102.dylib), create the missing symlink so that
+# fix-install-names.sh can find and rename/copy it correctly.
+find "$UNIVERSAL_LIB" -maxdepth 1 -name "*.dylib" ! -type l | while read -r lib; do
+    disk_name="$(basename "$lib")"
+    soname_path="$(otool -D "$lib" | awk 'NR==2{print $1}')"
+    soname="$(basename "$soname_path")"
+    if [ "$soname" != "$disk_name" ] && [ ! -e "${UNIVERSAL_LIB}/${soname}" ]; then
+        ln -sf "$disk_name" "${UNIVERSAL_LIB}/${soname}"
+        log_step "symlink: $soname → $disk_name"
+    fi
 done
 
 # Copy headers (architecture-independent — use arm64 as the source)
