@@ -4,8 +4,21 @@ source "$(dirname "$0")/common.sh"
 
 DEP_NAME="libplacebo"
 VERSION="${LIBPLACEBO_VERSION}"
-TARBALL="${DEP_NAME}-v${VERSION}.tar.bz2"
 SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
+
+# Use a recursive clone so the glad2 submodule (needed for OpenGL) is included.
+# A tarball from GitLab /-/archive/ does not bundle submodules.
+clone_source() {
+    if [ -d "$SRC_DIR" ]; then
+        log_step "Already cloned: ${DEP_NAME} v${VERSION}"
+        return 0
+    fi
+    log_step "Cloning: ${DEP_NAME} v${VERSION}"
+    git clone --recurse-submodules --depth 1 \
+        --branch "v${VERSION}" \
+        https://code.videolan.org/videolan/libplacebo.git \
+        "$SRC_DIR"
+}
 
 build_for_arch() {
     local arch="$1"
@@ -29,8 +42,7 @@ build_for_arch() {
     ninja -C "$build_dir" install
 }
 
-download_and_verify "$LIBPLACEBO_URL" "$LIBPLACEBO_SHA256" "$TARBALL"
-extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
+clone_source
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done

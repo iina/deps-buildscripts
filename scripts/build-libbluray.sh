@@ -36,7 +36,6 @@ build_for_arch() {
 
 download_and_verify "$LIBBLURAY_URL" "$LIBBLURAY_SHA256" "$TARBALL"
 extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
-( cd "$SRC_DIR" && autoreconf -fiv )
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done

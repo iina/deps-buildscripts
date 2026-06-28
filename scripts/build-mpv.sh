@@ -35,7 +35,6 @@ build_for_arch() {
         -Dlibarchive=enabled \
         -Duchardet=enabled \
         -Djpeg=enabled \
-        -Dlibplacebo=enabled \
         -Dswift-build=disabled \
         -Dtests=false
 
