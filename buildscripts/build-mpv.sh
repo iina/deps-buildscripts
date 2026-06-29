@@ -16,27 +16,25 @@ build_for_arch() {
     log_step "=== ${DEP_NAME} ${VERSION} — ${arch} ==="
     setup_arch_env "$arch"
 
-    export PKG_CONFIG_PATH="${prefix}/lib/pkgconfig"
-    export PKG_CONFIG="${PKG_CONFIG:-pkg-config}"
-
     meson_setup "$build_dir" "$SRC_DIR" "$arch" \
         -Dlibmpv=true \
         -Dcplayer=false \
+        -Dmacos-cocoa-cb=disabled \
+        -Dmacos-touchbar=disabled \
+        -Dmacos-media-player=disabled \
+        -Dmanpage-build=disabled \
+        -Dtests=false \
         -Dlua=luajit \
         -Djavascript=enabled \
         -Dlcms2=enabled \
         -Dvulkan=disabled \
         -Dgl=enabled \
-        -Dcocoa=enabled \
         -Dzimg=enabled \
         -Dlibbluray=enabled \
         -Dlibarchive=enabled \
         -Duchardet=enabled \
         -Djpeg=enabled \
-        -Dmacos-cocoa-cb=disabled \
-        -Dmacos-touchbar=disabled \
-        -Dmacos-media-player=disabled \
-        -Dtests=false
+        -Drubberband=enabled \
 
     ninja -C "$build_dir" -j"$JOBS"
     ninja -C "$build_dir" install

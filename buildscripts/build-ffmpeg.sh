@@ -31,37 +31,30 @@ build_for_arch() {
         --target-os=darwin \
         --cc=clang \
         --cxx=clang++ \
-        --extra-cflags="${CFLAGS}" \
-        --extra-ldflags="${LDFLAGS}" \
+        --extra-cflags="${CFLAGS} -I${prefix}/include" \
+        --extra-ldflags="${LDFLAGS} -L${prefix}/lib" \
         --pkg-config=pkg-config \
+        --enable-gpl \
         --enable-shared \
         --disable-static \
         --disable-programs \
         --disable-doc \
         --disable-debug \
-        --disable-autodetect \
-        --enable-avcodec \
-        --enable-avformat \
-        --enable-avutil \
-        --enable-swscale \
-        --enable-swresample \
-        --enable-avfilter \
         --enable-network \
-        --enable-protocol=http,https,file,pipe,crypto,tcp \
         --enable-securetransport \
-        --enable-zlib \
-        --enable-bzlib \
-        --enable-iconv \
-        --extra-libs="-liconv" \
+        --enable-videotoolbox \
+        --enable-audiotoolbox \
+        --enable-libspeex \
         --enable-libvorbis \
-        --enable-libopus \
         --enable-libdav1d \
         --enable-libass \
-        --enable-demuxer=matroska,mov,mp4,avi,ogg,flac,wav,aac,mp3,srt,ass,webvtt \
-        --enable-decoder=h264,hevc,vp8,vp9,av1,aac,mp3,flac,vorbis,opus,srt,ass,webvtt,mpeg4,mpeg2video,mjpeg,png,tiff,bmp \
-        --enable-encoder=png,tiff,bmp,mjpeg \
-        --enable-muxer=null,md5,rawvideo,image2 \
-        --enable-filter=scale,format,aresample,atrim,trim,setpts,fps,colorspace \
+        --enable-libwebp \
+        --enable-libjxl \
+        --enable-librav1e \
+        --enable-libbs2b \
+        --enable-libsoxr \
+        --enable-librubberband \
+        --enable-libzimg \
         ${cross_compile_flag:+$cross_compile_flag}
 
     make -j"$JOBS"

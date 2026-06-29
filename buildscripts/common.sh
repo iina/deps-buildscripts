@@ -1,12 +1,18 @@
 #!/bin/bash
 # Shared helpers sourced by every build-*.sh script.
-# Auto-sources config.env and versions.env if the caller hasn't done so.
 
 _COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ -z "${ROOT_DIR:-}" ]; then
-    source "${_COMMON_DIR}/../config.env"
-fi
+export ROOT_DIR="$(cd "${_COMMON_DIR}/.." && pwd)"
+export MACOSX_DEPLOYMENT_TARGET="11.0"
+export ARCHS="arm64 x86_64"
+export SOURCES_DIR="${ROOT_DIR}/sources"
+export BUILD_DIR="${ROOT_DIR}/build"
+export INSTALL_DIR="${ROOT_DIR}/install"
+export OUTPUT_DIR="${ROOT_DIR}/output"
+export MACOS_SDK="$(xcrun --show-sdk-path)"
+JOBS=$(sysctl -n hw.ncpu)
+
 if [ -z "${LIBOGG_VERSION:-}" ]; then
     source "${_COMMON_DIR}/../versions.env"
 fi
@@ -69,11 +75,7 @@ extract_source() {
     local filename="$1" dir_name="$2"
     local src_dir="${SOURCES_DIR}/${dir_name}"
 
-    if [ -d "$src_dir" ]; then
-        log_step "Already extracted: ${dir_name}"
-        return 0
-    fi
-
+    rm -rf "$src_dir"
     log_step "Extracting: ${filename}"
     local tarball="${SOURCES_DIR}/${filename}"
     local tmp_dir="${SOURCES_DIR}/.tmp_extract_$$"
@@ -122,7 +124,7 @@ apply_patches() {
 
     for patch_file in "${patches[@]}"; do
         log_step "Applying: $(basename "$patch_file")"
-        patch -d "$src_dir" -p1 < "$patch_file"
+        patch --forward -d "$src_dir" -p1 < "$patch_file"
     done
 }
 
@@ -231,7 +233,7 @@ meson_setup() {
     shift 3
     local prefix
     prefix="$(get_prefix "$arch")"
-    local machine_file="${ROOT_DIR}/cross/meson-${arch}-darwin.ini"
+    local machine_file="${ROOT_DIR}/extra/meson-${arch}-darwin.ini"
     local native_arch
     native_arch="$(uname -m)"
 
@@ -282,5 +284,10 @@ cmake_configure() {
         -DCMAKE_OSX_SYSROOT="$MACOS_SDK" \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_FIND_ROOT_PATH="${prefix};${MACOS_SDK}" \
+        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+        -DCMAKE_FIND_FRAMEWORK=LAST \
         "$@"
 }

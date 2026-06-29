@@ -1,19 +1,23 @@
 #!/bin/bash
-# -e is intentionally omitted: run_build catches failures individually so all
-# scripts run even when some fail, giving a full picture in one CI run.
-set -uo pipefail
+set -euo pipefail
 
 cd "$(dirname "$0")"
-source config.env
-source versions.env
+ROOT_DIR="$(pwd)"
+ARCHS="arm64 x86_64"
+SOURCES_DIR="${ROOT_DIR}/sources"
+BUILD_DIR="${ROOT_DIR}/build"
+INSTALL_DIR="${ROOT_DIR}/install"
+OUTPUT_DIR="${ROOT_DIR}/output"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
 ARCH_FILTER="${1:-all}"  # "all", "arm64", or "x86_64"
+shift 1
+PACKAGE_FILTER="$*"     # optional: one or more package names (e.g. "ffmpeg mpv")
 
 if [ "$ARCH_FILTER" != "all" ] && [ "$ARCH_FILTER" != "arm64" ] && [ "$ARCH_FILTER" != "x86_64" ]; then
-    echo "Usage: $0 [all|arm64|x86_64]" >&2
+    echo "Usage: $0 [all|arm64|x86_64] [package ...]" >&2
     exit 1
 fi
 
@@ -32,116 +36,118 @@ check_tool ninja      "brew install ninja"
 check_tool nasm       "brew install nasm"
 check_tool cmake      "brew install cmake"
 check_tool pkg-config "brew install pkg-config"
+check_tool cargo          "brew install rust"
+check_tool cargo-cinstall "brew install cargo-c"
 
 # ---------------------------------------------------------------------------
 # Create directory tree
 # ---------------------------------------------------------------------------
 mkdir -p "$SOURCES_DIR" "$BUILD_DIR" "$OUTPUT_DIR"
-LOG_DIR="${BUILD_DIR}/logs"
-mkdir -p "$LOG_DIR"
 for arch in $ARCHS; do
     mkdir -p "${INSTALL_DIR}/${arch}"
 done
 
 # ---------------------------------------------------------------------------
-# Build helpers
+# Build helper
 # ---------------------------------------------------------------------------
 
-FAILED_BUILDS=()
-FAILED_LOGS=()
+_BOLD="\033[1m"
+_CYAN="\033[36m"
+_GREEN="\033[32m"
+_RESET="\033[0m"
 
-log_step() {
-    echo "[$(date '+%H:%M:%S')] $*" >&2
+if [ -n "$PACKAGE_FILTER" ]; then
+    _PACKAGE_TOTAL=$(echo "$PACKAGE_FILTER" | wc -w | tr -d ' ')
+else
+    _PACKAGE_TOTAL=$(grep -c '^run buildscripts/build-' "$0")
+fi
+_PACKAGE_COUNT=0
+_START_TIME=$SECONDS
+
+_set_title() {
+    if [ -n "${TMUX:-}" ]; then
+        tmux rename-window "$1"
+    else
+        printf '\033]0;%s\007' "$1" >&2
+    fi
 }
 
-# run_build <script-name>
-# Tees script output to a per-script log file while streaming it live.
-# On failure, the log path is saved so errors can be replayed at the end.
-run_build() {
-    local name="$1"
-    local script="scripts/${name}"
-    local log="${LOG_DIR}/${name}.log"
-
-    if [ ! -f "$script" ]; then
-        log_step "SKIP: ${name} (not yet implemented)"
-        return
+# run <script> — skips if PACKAGE_FILTER is set and doesn't match the package name
+run() {
+    local script="$1"
+    local name="${script#buildscripts/build-}"  # strip leading path and "build-"
+    name="${name%.sh}"                     # strip .sh
+    if [ -n "$PACKAGE_FILTER" ]; then
+        case " $PACKAGE_FILTER " in
+            *" $name "*) ;;
+            *) return 0 ;;
+        esac
     fi
-
-    if bash "$script" 2>&1 | tee "$log"; then
-        log_step "OK: ${name}"
-    else
-        log_step "FAILED: ${name}"
-        FAILED_BUILDS+=("${name}")
-        FAILED_LOGS+=("${log}")
-    fi
+    _PACKAGE_COUNT=$(( _PACKAGE_COUNT + 1 ))
+    _set_title "Compiling ${name} (${_PACKAGE_COUNT}/${_PACKAGE_TOTAL})"
+    printf "\n${_BOLD}${_CYAN}╔══ [%d/%d] %s${_RESET}\n" \
+        "$_PACKAGE_COUNT" "$_PACKAGE_TOTAL" "$name" >&2
+    rm -rf "${BUILD_DIR}/${name}"
+    bash "$script"
+    printf "${_BOLD}${_GREEN}╚══ done: %s${_RESET}\n" "$name" >&2
 }
 
 # ---------------------------------------------------------------------------
 # Build in dependency order (Layer 1 → 4)
 # ---------------------------------------------------------------------------
 
-# --- Layer 1: Leaf libraries (no inter-dependencies) ---
-run_build build-libogg.sh
-run_build build-libvorbis.sh
-run_build build-opus.sh
-run_build build-freetype.sh
-run_build build-fribidi.sh
-run_build build-libunibreak.sh
-run_build build-dav1d.sh
-run_build build-luajit.sh
-run_build build-uchardet.sh
-run_build build-jpeg-turbo.sh
-run_build build-little-cms2.sh
-run_build build-mujs.sh
-run_build build-libudfread.sh
-run_build build-lz4.sh
-run_build build-zstd.sh
-run_build build-zimg.sh
+# --- Layer 1: Leaf libraries + encoders/decoders ---
+run buildscripts/build-freetype.sh         # font rendering
+run buildscripts/build-fribidi.sh          # unicode bidirectional algorithm
+run buildscripts/build-libunibreak.sh      # unicode line/work break algorithm
+run buildscripts/build-luajit.sh           # lua compiler required by mpv scripting
+run buildscripts/build-mujs.sh             # javascript interpreter, used by mpv scripting
+run buildscripts/build-uchardet.sh         # character encoding detector, used by mpv
+run buildscripts/build-little-cms2.sh      # ICC color profile library
+run buildscripts/build-libudfread.sh       # UDF filesystem reader required by libbluray
+run buildscripts/build-lz4.sh              # compression algorithm used by libarchive
+run buildscripts/build-zstd.sh             # compression algorithm used by libarchive
+run buildscripts/build-zimg.sh             # image scaling algorithm used by mpv's zscale filter
+run buildscripts/build-libbs2b.sh          # binaural audio filter
+run buildscripts/build-libsoxr.sh          # high-quality resampling
+
+## encoders
+run buildscripts/build-jpeg-turbo.sh       # provides libjpeg, used by mpv to encode jpeg screenshots
+run buildscripts/build-libwebp.sh          # WebP screenshots
+run buildscripts/build-rav1e.sh            # AV1/AVIF screenshots
+run buildscripts/build-libjxl.sh           # JPEG XL screenshots; uses bundled brotli, highway, lcms2
+
+## decoders
+run buildscripts/build-dav1d.sh            # AV1 decoder
+run buildscripts/build-speex.sh            # Speex audio format decoding support
+run buildscripts/build-libogg.sh           # base library for Ogg bitstream format
+run buildscripts/build-libvorbis.sh        # Ogg Vorbis audio decoder; depends on libogg
 
 # --- Layer 2: Libraries with Layer 1 dependencies ---
-run_build build-harfbuzz.sh         # depends on freetype
-run_build build-fontconfig.sh       # depends on freetype
-run_build build-libplacebo.sh       # depends on little-cms2; built without Vulkan
-run_build build-libbluray.sh        # depends on fontconfig, freetype, libudfread
-run_build build-libarchive.sh       # depends on lz4, zstd (plus system zlib/bzip2/libiconv)
+run buildscripts/build-harfbuzz.sh         # text shaping engine; depends on freetype
+run buildscripts/build-fontconfig.sh       # font configuration and matching; depends on freetype
+run buildscripts/build-libarchive.sh       # reading archive files used by mpv; depends on lz4, zstd
+run buildscripts/build-rubberband.sh       # audio pitch/tempo, used by both mpv and FFmpeg
 
 # --- Layer 3: Core media libraries ---
-run_build build-libass.sh           # depends on freetype, fribidi, harfbuzz, fontconfig, libunibreak
-run_build build-ffmpeg.sh           # depends on dav1d, opus, libvorbis
+run buildscripts/build-libbluray.sh        # depends on fontconfig, freetype, libudfread
+run buildscripts/build-libplacebo.sh       # depends on little-cms2
+run buildscripts/build-libass.sh           # depends on freetype, fribidi, harfbuzz, fontconfig, libunibreak
+run buildscripts/build-ffmpeg.sh           # depends on all Layer 1+2 libs above
 
 # --- Layer 4: mpv ---
-run_build build-mpv.sh              # depends on everything above
+run buildscripts/build-mpv.sh
 
 # ---------------------------------------------------------------------------
 # Combine per-arch builds into universal binaries
 # ---------------------------------------------------------------------------
-if [ "$ARCH_FILTER" = "all" ]; then
-    bash scripts/create-universal.sh
+if [ "$ARCH_FILTER" = "all" ] && [ -z "$PACKAGE_FILTER" ]; then
+    bash buildscripts/create-universal.sh
 fi
 
-# ---------------------------------------------------------------------------
-# Final report — replay the tail of every failed script's log
-# ---------------------------------------------------------------------------
-if [ ${#FAILED_BUILDS[@]} -gt 0 ]; then
-    echo "" >&2
-    echo "################################################################" >&2
-    echo "# FAILED BUILDS (${#FAILED_BUILDS[@]}):" >&2
-    printf '#   - %s\n' "${FAILED_BUILDS[@]}" >&2
-    echo "################################################################" >&2
-
-    for i in "${!FAILED_BUILDS[@]}"; do
-        echo "" >&2
-        echo "================================================================" >&2
-        echo "  ERROR LOG: ${FAILED_BUILDS[$i]}" >&2
-        echo "================================================================" >&2
-        tail -80 "${FAILED_LOGS[$i]}" >&2
-    done
-
-    echo "" >&2
-    echo "################################################################" >&2
-    echo "# END OF ERROR SUMMARY" >&2
-    echo "################################################################" >&2
-    exit 1
+if [ -n "${TMUX:-}" ]; then
+    tmux set-window-option automatic-rename on
 fi
 
-echo "Build complete. Output in ${OUTPUT_DIR}/"
+_ELAPSED=$(( SECONDS - _START_TIME ))
+echo "Built ${_PACKAGE_COUNT}/${_PACKAGE_TOTAL} packages in $(( _ELAPSED / 60 ))m $(( _ELAPSED % 60 ))s. Output in ${OUTPUT_DIR}/"

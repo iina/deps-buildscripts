@@ -35,8 +35,5 @@ download_and_verify "$LIBOGG_URL" "$LIBOGG_SHA256" "$TARBALL"
 extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
-for arch in $ARCHS; do
-    build_for_arch "$arch"
-done
-
+for arch in $ARCHS; do build_for_arch "$arch"; done
 lipo_merge "$DEP_NAME"

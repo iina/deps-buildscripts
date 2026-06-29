@@ -2,8 +2,8 @@
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-DEP_NAME="opus"
-VERSION="${OPUS_VERSION}"
+DEP_NAME="speex"
+VERSION="${SPEEX_VERSION}"
 TARBALL="${DEP_NAME}-${VERSION}.tar.gz"
 SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
 
@@ -24,14 +24,13 @@ build_for_arch() {
         --host="$HOST_TRIPLE" \
         --enable-shared \
         --disable-static \
-        --disable-extra-programs \
-        --disable-doc
+        --disable-ogg
 
     make -j"$JOBS"
     make install
 }
 
-download_and_verify "$OPUS_URL" "$OPUS_SHA256" "$TARBALL"
+download_and_verify "$SPEEX_URL" "$SPEEX_SHA256" "$TARBALL"
 extract_source "$TARBALL" "${DEP_NAME}-${VERSION}"
 apply_patches "$DEP_NAME" "$SRC_DIR"
 

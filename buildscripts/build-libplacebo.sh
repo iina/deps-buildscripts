@@ -16,7 +16,7 @@ clone_source() {
     log_step "Cloning: ${DEP_NAME} v${VERSION}"
     git clone --recurse-submodules --depth 1 \
         --branch "v${VERSION}" \
-        https://code.videolan.org/videolan/libplacebo.git \
+        "${LIBPLACEBO_REPO}" \
         "$SRC_DIR"
 }
 

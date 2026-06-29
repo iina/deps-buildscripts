@@ -1,0 +1,10 @@
+--- a/src/common/sysutils.h
++++ b/src/common/sysutils.h
+@@ -23,6 +23,8 @@
+
+ #ifndef RUBBERBAND_SYSUTILS_H
+ #define RUBBERBAND_SYSUTILS_H
++
++#include <cstddef>
+
+ #ifdef __clang__

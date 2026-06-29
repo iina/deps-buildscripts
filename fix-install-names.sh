@@ -1,33 +1,23 @@
 #!/bin/bash
 # BFS from libmpv: collect all transitively referenced dylibs that live in
-# src_dir, copy them to dest_dir (or fix in-place when dest_dir is omitted),
-# and rewrite LC_ID_DYLIB / LC_LOAD_DYLIB entries to use @rpath.
+# src_dir, copy them to dest_dir, and rewrite LC_ID_DYLIB / LC_LOAD_DYLIB
+# entries to use @rpath.  The originals in src_dir are never modified.
 #
 # The output file is named after the LC_ID_DYLIB basename (the "soname"), not
 # the disk filename.  This correctly handles FFmpeg's three-level versioning
 # where libavcodec.62.28.102.dylib has LC_ID_DYLIB = …/libavcodec.62.dylib.
 #
-# Usage (in-place, default for CI after lipo):
-#   fix-install-names.sh [lib_dir]
-#
-# Usage (copy-then-fix, like the IINA Ruby script — preserves src unchanged):
-#   fix-install-names.sh <src_lib_dir> <dest_lib_dir>
+# Usage:
+#   fix-install-names.sh [src_lib_dir [dest_lib_dir]]
+#   Defaults: src = install/arm64/lib   dest = output/
 set -euo pipefail
-source "$(dirname "$0")/common.sh"
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="${ROOT_DIR}/install"
+OUTPUT_DIR="${ROOT_DIR}/output"
 
-src_dir="${1:-${OUTPUT_DIR}/lib}"
-src_dir="$(cd "$src_dir" && pwd)"
-
-if [ -n "${2:-}" ]; then
-    mkdir -p "$2"
-    dest_dir="$(cd "$2" && pwd)"
-    in_place=0
-else
-    dest_dir="$src_dir"
-    in_place=1
-fi
-
-log_step "Fixing install names  src=$src_dir  dest=$dest_dir"
+src_dir="$(cd "${1:-${INSTALL_DIR}/arm64/lib}" && pwd)"
+mkdir -p "${2:-${OUTPUT_DIR}}"
+dest_dir="$(cd "${2:-${OUTPUT_DIR}}" && pwd)"
 
 # ── "seen" set (bash 3.2 compatible; no associative arrays) ──────────────────
 # Key = LC_ID_DYLIB basename (= what consumers reference, e.g. libavcodec.62.dylib)
@@ -74,24 +64,22 @@ _fix_one() {
     # while consumers reference the soname (libavcodec.62.dylib).
     local dest_file="$dest_dir/$key"
 
-    if [ "$in_place" = "1" ]; then
-        # Rename disk file to the name consumers reference if they differ.
-        if [ "$key" != "$name" ]; then
-            mv "$real" "$src_dir/$key"
-            log_step "  renamed  $name  →  $key"
-        fi
+    cp -p "$real" "$dest_file"
+    if [ "$key" != "$name" ]; then
+        echo "$name  →  $key"
     else
-        # Copy (only if not already present) using the consumer-facing name.
-        [ -f "$dest_file" ] || cp -p "$real" "$dest_file"
+        echo "$name"
     fi
 
-    log_step "  $key  →  @rpath/$key"
-
-    # Fix own install name.
     install_name_tool -id "@rpath/$key" "$dest_file"
 
-    # Walk LC_LOAD_DYLIB entries from dest_file (already has the updated -id).
-    # Rewrite any dep that lives in src_dir, then enqueue it.
+    local rpath
+    while IFS= read -r rpath; do
+        case "$rpath" in @*) continue ;; esac
+        install_name_tool -delete_rpath "$rpath" "$dest_file" 2>/dev/null || true
+        echo "  rpath  $rpath  (removed)"
+    done < <(otool -l "$dest_file" | awk '/cmd LC_RPATH/{f=1} f && /path /{print $2; f=0}')
+
     local dep dep_base dep_path dep_real
     while IFS= read -r dep; do
         [ -z "$dep" ] && continue
@@ -101,6 +89,7 @@ _fix_one() {
         [ -f "$dep_path" ] || continue      # system / framework lib — skip
 
         if [ "$dep" != "@rpath/$dep_base" ]; then
+            echo "  dep  $dep  →  @rpath/$dep_base"
             install_name_tool -change "$dep" "@rpath/$dep_base" "$dest_file"
         fi
 
@@ -115,4 +104,4 @@ while [ "$_q_idx" -lt "${#queue_paths[@]}" ]; do
     _q_idx=$((_q_idx + 1))
 done
 
-log_step "Done — processed ${#queue_paths[@]} libraries."
+echo "Done — processed ${#queue_paths[@]} libraries."

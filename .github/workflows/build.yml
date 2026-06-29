@@ -18,7 +18,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew install nasm meson autoconf automake libtool
+          brew install nasm meson autoconf automake libtool cmake cargo-c
 
       - name: Build dependencies
         run: bash build.sh arm64
@@ -69,7 +69,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew install nasm meson autoconf automake libtool
+          brew install nasm meson autoconf automake libtool cmake cargo-c
 
       - name: Build dependencies
         run: bash build.sh x86_64
@@ -132,10 +132,10 @@ jobs:
           path: install/x86_64/
 
       - name: Create universal binaries
-        run: bash scripts/create-universal.sh
+        run: bash buildscripts/create-universal.sh
 
       - name: Fix install names
-        run: bash scripts/fix-install-names.sh
+        run: bash fix-install-names.sh
 
       - name: Verify universal binaries
         run: |
