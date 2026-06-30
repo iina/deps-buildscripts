@@ -7,6 +7,7 @@ This repo holds build scripts that can build the dependencies for IINA. Unlike t
 - ninja
 - cmake
 - pkg-config
+- automake (also autoconf)
 - rust (for `dav1d`, can be installed via rustup)
 - cargo-c (for `dav1d` as well, installed via `cargo install cargo-c`)
 - nasm (for FFmpeg x86 builds)

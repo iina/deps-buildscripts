@@ -40,6 +40,7 @@ check_tool ninja      "brew install ninja"
 check_tool nasm       "brew install nasm"
 check_tool cmake      "brew install cmake"
 check_tool pkg-config "brew install pkg-config"
+check_tool aclocal    "brew install automake"  # also pulls in autoconf
 check_tool cargo          "brew install rust"
 check_tool cargo-cinstall "brew install cargo-c"
 
