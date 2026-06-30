@@ -21,6 +21,8 @@ All dependencies are divided in to 4 layers, which defines the order of compilat
 - **Layer 3**: Core media libraries: FFmpeg, libplacebo, libbluray, and libass. More imporant and directly depended by mpv.
 - **Layer 4**: mpv.
 
+Since layer 3 and layer 4 packages are more imporant since they are directly used by libmpv, we need to make clear decisions on their compilation flags, especially when updating their versions.
+
 ## Usage
 
 First prepare the building dependencies. If tools are missing in the current environment, the script will try to install them via `brew install`.
@@ -31,7 +33,13 @@ First prepare the building dependencies. If tools are missing in the current env
 ./build.sh all
 ```
 
-When building for both architectures, cross compilation will be enabled, and fat libraries will be generated.
+When building for both architectures, cross compilation will be enabled, and fat libraries will be generated. After successfully generated all dependencies needed, we have to fix their install names to @rpath for them to find dependencies when bundled.
+
+```bash
+./fix-install-names.sh install/arm64/lib/ output/
+```
+
+The script will try to find `libmpv.*.dylib` from the first path provided (default to `install/arm64/lib/`), and perform a BFS from the found libmpv to make sure the install name for every dependencies is fixed. The resulting binaries are copied to the second path provided (default to `output/`). Note that the original binaries in the install folder are not touched; only the copies are fixed.
 
 ## Source & Cache
 
