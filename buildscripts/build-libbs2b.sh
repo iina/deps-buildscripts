@@ -41,4 +41,3 @@ sed -i '' '/^bin_PROGRAMS/,/^$/d' "${SRC_DIR}/src/Makefile.am"
 autoreconf --force --verbose --install "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done
-lipo_merge "$DEP_NAME"

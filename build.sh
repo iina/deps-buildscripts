@@ -7,15 +7,12 @@ ARCHS="arm64 x86_64"
 SOURCES_DIR="${ROOT_DIR}/sources"
 BUILD_DIR="${ROOT_DIR}/build"
 INSTALL_DIR="${ROOT_DIR}/install"
-OUTPUT_DIR="${ROOT_DIR}/output"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
 ARCH_FILTER="${1:-all}"  # "all", "arm64", or "x86_64"
-# `shift` with no positional args returns non-zero, which would trip `set -e`
-# and exit silently when ./compile is run with no arguments. Guard it.
-[ $# -gt 0 ] && shift
+[ $# -gt 0 ] && shift    # guarded: bare `shift` returns non-zero and trips `set -e`
 PACKAGE_FILTER="$*"     # optional: one or more package names (e.g. "ffmpeg mpv")
 
 if [ "$ARCH_FILTER" != "all" ] && [ "$ARCH_FILTER" != "arm64" ] && [ "$ARCH_FILTER" != "x86_64" ]; then
@@ -27,8 +24,7 @@ if [ "$ARCH_FILTER" != "all" ]; then
     ARCHS="$ARCH_FILTER"
 fi
 
-# Export so child build-*.sh processes inherit the (possibly filtered) arch list
-# instead of falling back to common.sh's default of "arm64 x86_64".
+# Export so child build-*.sh inherit the filtered list, not common.sh's default.
 export ARCHS
 
 # ---------------------------------------------------------------------------
@@ -49,19 +45,14 @@ check_tool cargo-cinstall "brew install cargo-c"
 # ---------------------------------------------------------------------------
 # Create directory tree
 # ---------------------------------------------------------------------------
-# On a full build (no package filter), wipe the install prefix for each arch
-# being built so packages can't link against stale artifacts from a previous
-# run (e.g. an old version, or a package since removed from the build list).
-# Scoped per-arch: wiping the whole install/ would destroy the other arch's
-# tree and silently degrade the final lipo_merge to single-arch.
-# Skipped for partial builds, where dependencies must remain in the prefix.
+# For full build, install folder is cleared before building
 if [ -z "$PACKAGE_FILTER" ]; then
     for arch in $ARCHS; do
         rm -rf "${INSTALL_DIR}/${arch}"
     done
 fi
 
-mkdir -p "$SOURCES_DIR" "$BUILD_DIR" "$OUTPUT_DIR"
+mkdir -p "$SOURCES_DIR" "$BUILD_DIR"
 for arch in $ARCHS; do
     mkdir -p "${INSTALL_DIR}/${arch}"
 done
@@ -91,8 +82,7 @@ _set_title() {
     fi
 }
 
-# Restore the tmux window name on any exit (success, error, or interrupt),
-# so a failed build doesn't leave the pane stuck on "Compiling ...".
+# Restore the tmux window name on any exit, even a failed/interrupted build.
 _restore_title() {
     if [ -n "${TMUX:-}" ]; then
         tmux set-window-option automatic-rename on
@@ -166,12 +156,5 @@ run buildscripts/build-ffmpeg.sh           # depends on all Layer 1+2 libs above
 # --- Layer 4: mpv ---
 run buildscripts/build-mpv.sh
 
-# ---------------------------------------------------------------------------
-# Combine per-arch builds into universal binaries
-# ---------------------------------------------------------------------------
-if [ "$ARCH_FILTER" = "all" ] && [ -z "$PACKAGE_FILTER" ]; then
-    bash buildscripts/create-universal.sh
-fi
-
 _ELAPSED=$(( SECONDS - _START_TIME ))
-echo "Built ${_PACKAGE_COUNT}/${_PACKAGE_TOTAL} packages in $(( _ELAPSED / 60 ))m $(( _ELAPSED % 60 ))s. Output in ${OUTPUT_DIR}/"
+echo "Built ${_PACKAGE_COUNT}/${_PACKAGE_TOTAL} packages in $(( _ELAPSED / 60 ))m $(( _ELAPSED % 60 ))s. Installed to ${INSTALL_DIR}/<arch>/"

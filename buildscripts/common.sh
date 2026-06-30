@@ -177,50 +177,6 @@ setup_arch_env() {
 }
 
 # ---------------------------------------------------------------------------
-# Universal binary merging
-# ---------------------------------------------------------------------------
-
-# lipo_merge <dep-name>
-# For each non-symlink .dylib in install/arm64/lib/ that also exists in
-# install/x86_64/lib/, runs lipo -create and writes to output/lib/.
-# Silently skips if either arch prefix is absent (single-arch CI job).
-lipo_merge() {
-    local dep_name="$1"
-    local arm64_lib="${INSTALL_DIR}/arm64/lib"
-    local x86_64_lib="${INSTALL_DIR}/x86_64/lib"
-
-    if [ ! -d "$arm64_lib" ] || [ ! -d "$x86_64_lib" ]; then
-        log_step "lipo_merge ${dep_name}: single-arch build, skipping"
-        return 0
-    fi
-
-    mkdir -p "${OUTPUT_DIR}/lib" "${OUTPUT_DIR}/include"
-
-    find "$arm64_lib" -name "*.dylib" ! -type l | while read -r arm_lib; do
-        local libname x86_lib out_lib
-        libname="$(basename "$arm_lib")"
-        x86_lib="${x86_64_lib}/${libname}"
-        out_lib="${OUTPUT_DIR}/lib/${libname}"
-
-        if [ -f "$x86_lib" ]; then
-            lipo -create "$arm_lib" "$x86_lib" -output "$out_lib"
-            log_step "lipo: ${libname}"
-        else
-            cp "$arm_lib" "$out_lib"
-            log_step "lipo: ${libname} (arm64 only)"
-        fi
-    done
-
-    # Re-create version symlinks (e.g. libogg.0.dylib → libogg.dylib)
-    find "$arm64_lib" -name "*.dylib" -type l | while read -r link; do
-        local linkname target
-        linkname="$(basename "$link")"
-        target="$(readlink "$link")"
-        ln -sf "$target" "${OUTPUT_DIR}/lib/${linkname}" 2>/dev/null || true
-    done
-}
-
-# ---------------------------------------------------------------------------
 # Meson build helper
 # ---------------------------------------------------------------------------
 

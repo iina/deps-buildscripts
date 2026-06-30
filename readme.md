@@ -30,18 +30,32 @@ Since layer 3 and layer 4 packages are directly used by libmpv, we need to make 
 First prepare the building dependencies. If tools are missing in the current environment, the script will try to install them via `brew install`.
 
 ```bash
-./build.sh arm64 # For arm builds
+./build.sh arm64  # For arm builds
 ./build.sh x86_64 # For x86 builds
-./build.sh all
+./build.sh all    # Default
 ```
 
-When building for both architectures, cross compilation will be enabled, and fat libraries will be generated. After successfully generating all needed dependencies, we have to fix their install names to @rpath so they can find their dependencies when bundled.
+The build scripts only compile each package and install it into `install/<arch>/`; they do no lipo, install-name, or signing work. When building `all`, cross compilation is enabled and the post-build packaging step runs automatically (see below).
+
+After installing all dependencies, we should fix their install names before creating universal binaries.
 
 ```bash
-./fix-install-names.sh install/arm64/lib/ output/
+./fix-install-names.sh arm64
+./fix-install-names.sh x86_64
+./fix-install-names.sh all     # Default
 ```
 
-The script will try to find `libmpv.*.dylib` from the first path provided (default to `install/arm64/lib/`), and perform a BFS from the found libmpv to make sure the install name for every dependencies is fixed. The resulting binaries are copied to the second path provided (default to `output/`). Note that the original binaries in the install folder are not touched; only the copies are fixed.
+Use `lipo.sh` to create universal binaries. This script will find all `dylibs` in `output/arm64/` and `output/x86_64` and `lipo` them into `output/fat`. An ad-hoc sign will also be performed after lipo'ing.
+
+```bash
+./lipo.sh
+```
+
+Finally, copy the headers used by IINA to `output/include/`:
+
+```bash
+./copy-headers.sh
+```
 
 ## Source & Cache
 

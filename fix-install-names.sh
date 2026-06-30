@@ -1,36 +1,35 @@
 #!/bin/bash
-# BFS from libmpv: collect all transitively referenced dylibs that live in
-# src_dir, copy them to dest_dir, and rewrite LC_ID_DYLIB / LC_LOAD_DYLIB
-# entries to use @rpath.  The originals in src_dir are never modified.
+# Fix install names for one or both arch prefixes. For each arch, BFS from
+# libmpv through install/<arch>/lib, copy every transitively referenced dylib
+# to output/<arch>, and rewrite LC_ID_DYLIB / LC_LOAD_DYLIB to @rpath. The
+# originals in install/ are never modified.
 #
-# The output file is named after the LC_ID_DYLIB basename (the "soname"), not
-# the disk filename.  This correctly handles FFmpeg's three-level versioning
-# where libavcodec.62.28.102.dylib has LC_ID_DYLIB = …/libavcodec.62.dylib.
+# Output files are named after the LC_ID_DYLIB basename (the "soname"), not the
+# on-disk filename — this handles FFmpeg's versioning where the on-disk
+# libavcodec.62.28.102.dylib has soname libavcodec.62.dylib.
 #
 # Usage:
-#   fix-install-names.sh [src_lib_dir [dest_lib_dir]]
-#   Defaults: src = install/arm64/lib   dest = output/
+#   fix-install-names.sh [all|arm64|x86_64]   (default: all)
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="${ROOT_DIR}/install"
 OUTPUT_DIR="${ROOT_DIR}/output"
 
-src_dir="$(cd "${1:-${INSTALL_DIR}/arm64/lib}" && pwd)"
-mkdir -p "${2:-${OUTPUT_DIR}}"
-dest_dir="$(cd "${2:-${OUTPUT_DIR}}" && pwd)"
+ARCH_FILTER="${1:-all}"
+case "$ARCH_FILTER" in
+    all)          archs=(arm64 x86_64) ;;
+    arm64|x86_64) archs=("$ARCH_FILTER") ;;
+    *) echo "Usage: $0 [all|arm64|x86_64]" >&2; exit 1 ;;
+esac
 
-# ── "seen" set (bash 3.2 compatible; no associative arrays) ──────────────────
-# Key = LC_ID_DYLIB basename (= what consumers reference, e.g. libavcodec.62.dylib)
+# ── per-arch BFS state (reset at the start of each fix_arch) ──────────────────
+src_dir=""; dest_dir=""
 _seen_file="$(mktemp)"
 trap 'rm -f "$_seen_file"' EXIT
+queue_keys=(); queue_paths=(); _q_idx=0
 
 _mark_seen() { printf '%s\n' "$1" >> "$_seen_file"; }
 _is_seen()   { grep -qFx "$1" "$_seen_file" 2>/dev/null; }
-
-# ── BFS queue (parallel arrays) ──────────────────────────────────────────────
-queue_keys=()   # LC_ID_DYLIB basename = seen-set key
-queue_paths=()  # real file path in src_dir
-_q_idx=0
 
 _enqueue() {       # <key> <real_src_path>
     local key="$1" real="$2"
@@ -40,28 +39,14 @@ _enqueue() {       # <key> <real_src_path>
     queue_paths+=("$real")
 }
 
-# ── Find libmpv entry point ───────────────────────────────────────────────────
-shopt -s nullglob
-_cands=("$src_dir"/libmpv.*.dylib "$src_dir"/libmpv.dylib)
-shopt -u nullglob
-_entry_real=""
-for _f in "${_cands[@]}"; do
-    [ -f "$_f" ] || continue
-    _entry_real="$(realpath "$_f")"
-    break
-done
-[ -n "$_entry_real" ] || { echo "ERROR: libmpv not found in $src_dir" >&2; exit 1; }
-_enqueue "$(basename "$_entry_real")" "$_entry_real"
-
-# ── Process one dylib ─────────────────────────────────────────────────────────
+# ── Process one dylib (operates on the current src_dir / dest_dir) ────────────
 _fix_one() {
     local key="$1" real="$2"
     local name; name="$(basename "$real")"
 
-    # Use the key (= dep_base = what the consumer embeds) as the canonical
-    # output name and @rpath name.  This is correct even when the on-disk
-    # filename is a full-version string (e.g. libavcodec.62.28.102.dylib)
-    # while consumers reference the soname (libavcodec.62.dylib).
+    # Use the key (= what the consumer embeds) as the canonical output name and
+    # @rpath name — correct even when the on-disk filename is a full-version
+    # string (libavcodec.62.28.102.dylib) but consumers reference the soname.
     local dest_file="$dest_dir/$key"
 
     cp -p "$real" "$dest_file"
@@ -98,10 +83,43 @@ _fix_one() {
     done < <(otool -L "$dest_file" | tail -n +2 | awk '{print $1}')
 }
 
-# ── BFS loop ──────────────────────────────────────────────────────────────────
-while [ "$_q_idx" -lt "${#queue_paths[@]}" ]; do
-    _fix_one "${queue_keys[$_q_idx]}" "${queue_paths[$_q_idx]}"
-    _q_idx=$((_q_idx + 1))
-done
+# ── Fix one arch: install/<arch>/lib → output/<arch> ─────────────────────────
+fix_arch() {
+    local arch="$1"
+    src_dir="${INSTALL_DIR}/${arch}/lib"
+    if [ ! -d "$src_dir" ]; then
+        echo "WARN: ${src_dir} not found — skipping ${arch}" >&2
+        return 0
+    fi
+    src_dir="$(cd "$src_dir" && pwd)"
 
-echo "Done — processed ${#queue_paths[@]} libraries."
+    dest_dir="${OUTPUT_DIR}/${arch}"
+    rm -rf "$dest_dir"
+    mkdir -p "$dest_dir"
+    dest_dir="$(cd "$dest_dir" && pwd)"
+
+    # Reset BFS state for this arch.
+    : > "$_seen_file"
+    queue_keys=(); queue_paths=(); _q_idx=0
+
+    # Find the libmpv entry point.
+    shopt -s nullglob
+    local cands=("$src_dir"/libmpv.*.dylib "$src_dir"/libmpv.dylib)
+    shopt -u nullglob
+    local entry="" f
+    for f in "${cands[@]}"; do
+        [ -f "$f" ] || continue
+        entry="$(realpath "$f")"; break
+    done
+    [ -n "$entry" ] || { echo "ERROR: libmpv not found in $src_dir" >&2; exit 1; }
+    _enqueue "$(basename "$entry")" "$entry"
+
+    echo "=== ${arch}: ${src_dir} → ${dest_dir} ==="
+    while [ "$_q_idx" -lt "${#queue_paths[@]}" ]; do
+        _fix_one "${queue_keys[$_q_idx]}" "${queue_paths[$_q_idx]}"
+        _q_idx=$((_q_idx + 1))
+    done
+    echo "Done ${arch} — processed ${#queue_paths[@]} libraries."
+}
+
+for arch in "${archs[@]}"; do fix_arch "$arch"; done

@@ -51,4 +51,3 @@ clone_source
 apply_patches "$DEP_NAME" "$SRC_DIR"
 
 for arch in $ARCHS; do build_for_arch "$arch"; done
-lipo_merge "$DEP_NAME"
