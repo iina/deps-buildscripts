@@ -13,7 +13,9 @@ OUTPUT_DIR="${ROOT_DIR}/output"
 # Argument parsing
 # ---------------------------------------------------------------------------
 ARCH_FILTER="${1:-all}"  # "all", "arm64", or "x86_64"
-shift 1
+# `shift` with no positional args returns non-zero, which would trip `set -e`
+# and exit silently when ./compile is run with no arguments. Guard it.
+[ $# -gt 0 ] && shift
 PACKAGE_FILTER="$*"     # optional: one or more package names (e.g. "ffmpeg mpv")
 
 if [ "$ARCH_FILTER" != "all" ] && [ "$ARCH_FILTER" != "arm64" ] && [ "$ARCH_FILTER" != "x86_64" ]; then

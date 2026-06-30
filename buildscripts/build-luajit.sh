@@ -33,20 +33,28 @@ build_for_arch() {
             DEFAULT_CC=clang \
             amalg
     else
-        # Cross-compile: minilua (host tool) is still built natively;
-        # the rest targets the foreign arch.
-        local cross_prefix
-        if [ "$arch" = "arm64" ]; then
-            cross_prefix="aarch64-apple-darwin-"
-        else
-            cross_prefix="x86_64-apple-darwin-"
-        fi
+        # Cross-compile (e.g. x86_64 target on an arm64 host).
+        #
+        # macOS has no arch-prefixed toolchain (there is no x86_64-apple-darwin-gcc);
+        # clang cross-compiles via -arch, so CROSS must stay empty — otherwise the
+        # Makefile invokes "<CROSS>gcc" and dies with "Unsupported target architecture".
+        #
+        # The host tools (minilua, buildvm) execute on the BUILD machine during the
+        # build, so they must be compiled for the native arch. LuaJIT's HOST_ACFLAGS
+        # pulls in CCOPTIONS, which contains $(XCFLAGS) and $(CFLAGS) — so the target
+        # -arch must NOT travel through those vars or the host tools get built for the
+        # foreign arch and can't run. We therefore:
+        #   - pass the target -arch only via TARGET_FLAGS (target-only by design), and
+        #   - blank CFLAGS/LDFLAGS on the make command line (setup_arch_env exports them
+        #     with -arch <target>, and they'd otherwise leak into the host build).
+        # Command-line assignments override the inherited environment in make.
         make -C "$src_dir" -j"$JOBS" \
             MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET}" \
+            CC="clang" \
             HOST_CC="clang" \
-            CROSS="${cross_prefix}" \
+            CFLAGS="" \
+            LDFLAGS="" \
             TARGET_FLAGS="${target_cflags}" \
-            XCFLAGS="${target_cflags}" \
             PREFIX="$prefix" \
             amalg
     fi

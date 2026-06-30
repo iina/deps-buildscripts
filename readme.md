@@ -1,6 +1,8 @@
 # IINA dependency build scripts
 
-This repo holds build scripts that can build the dependencies for IINA. Unlike the old method (https://github.com/iina/homebrew-mpv-iina), we are not depending on Homebrew to compile libraries; brew is only used to download some building tools.
+This repo holds build scripts that build the dependencies for IINA. Unlike the old method (https://github.com/iina/homebrew-mpv-iina), we do not depend on Homebrew to compile libraries; brew is only used to download some build tools.
+
+This build system is only tested on the latest macOS releases. Older versions of macOS might happen to work, but there is no guarantee.
 
 ## Building Tools
 Make sure they are available in PATH, otherwise the script will try to automatically install them from Homebrew.
@@ -9,19 +11,19 @@ Make sure they are available in PATH, otherwise the script will try to automatic
 - cmake
 - pkg-config
 - automake (also autoconf)
-- rust (for `dav1d`, can be installed via rustup)
-- cargo-c (for `dav1d` as well, installed via `cargo install cargo-c`)
-- nasm (for FFmpeg x86 builds)
+- rust (for `rav1e`, can be installed via rustup)
+- cargo-c (for `rav1e` as well, installed via `cargo install cargo-c`)
+- nasm (for x86 assembly builds, e.g. FFmpeg and dav1d)
 
 ## Structure
-All dependencies are divided in to 4 layers, which defines the order of compilation.
+All dependencies are divided into 4 layers, which define the order of compilation.
 
-- **Layer 1**: Leaf libraries that dones't depend on other libraries. All encoders and decoders are also in this layer since their dependency tree is straightfoward.
+- **Layer 1**: Leaf libraries that don't depend on other libraries. All encoders and decoders are also in this layer since their dependency tree is straightforward.
 - **Layer 2**: Other libraries with layer 1 dependencies.
-- **Layer 3**: Core media libraries: FFmpeg, libplacebo, libbluray, and libass. More imporant and directly depended by mpv.
+- **Layer 3**: Core media libraries: FFmpeg, libplacebo, libbluray, and libass. More important and directly depended on by mpv.
 - **Layer 4**: mpv.
 
-Since layer 3 and layer 4 packages are more imporant since they are directly used by libmpv, we need to make clear decisions on their compilation flags, especially when updating their versions.
+Since layer 3 and layer 4 packages are directly used by libmpv, we need to make clear decisions on their compilation flags, especially when updating their versions.
 
 ## Usage
 
@@ -33,7 +35,7 @@ First prepare the building dependencies. If tools are missing in the current env
 ./build.sh all
 ```
 
-When building for both architectures, cross compilation will be enabled, and fat libraries will be generated. After successfully generated all dependencies needed, we have to fix their install names to @rpath for them to find dependencies when bundled.
+When building for both architectures, cross compilation will be enabled, and fat libraries will be generated. After successfully generating all needed dependencies, we have to fix their install names to @rpath so they can find their dependencies when bundled.
 
 ```bash
 ./fix-install-names.sh install/arm64/lib/ output/
@@ -43,13 +45,13 @@ The script will try to find `libmpv.*.dylib` from the first path provided (defau
 
 ## Source & Cache
 
-The source code download point and version used for each library is defined in [`versions.env`](versions.env).There are 2 ways of acquiring source code:
+The source code download point and version used for each library is defined in [`versions.env`](versions.env). There are 2 ways of acquiring source code:
 
 - Tarball download. Tarball URL, version, and SHA256 are required.
-- Git repo download. Repo URL, version tag are requried. This is sometimes needed for acquiring submodules which are typically missing in the tallballs (`libplacebo`).
+- Git repo download. Repo URL and version tag are required. This is sometimes needed for acquiring submodules, which are typically missing in the tarballs (`libplacebo`).
 
-The downloaded source code is stored in `sources/`, tempory build files are in `build/`; delete these folders if you want to remove the cache.
+The downloaded source code is stored in `sources/`, and temporary build files are in `build/`; delete these folders if you want to remove the cache.
 
 ## Patches
 
-If patches are need to be compiled with, put them under `patches/{package_name}`.
+If patches need to be applied, put them under `patches/{package_name}`.
