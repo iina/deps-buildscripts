@@ -25,6 +25,10 @@ if [ "$ARCH_FILTER" != "all" ]; then
     ARCHS="$ARCH_FILTER"
 fi
 
+# Export so child build-*.sh processes inherit the (possibly filtered) arch list
+# instead of falling back to common.sh's default of "arm64 x86_64".
+export ARCHS
+
 # ---------------------------------------------------------------------------
 # Check required build tools
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ _COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export ROOT_DIR="$(cd "${_COMMON_DIR}/.." && pwd)"
 export MACOSX_DEPLOYMENT_TARGET="11.0"
-export ARCHS="arm64 x86_64"
+export ARCHS="${ARCHS:-arm64 x86_64}"
 export SOURCES_DIR="${ROOT_DIR}/sources"
 export BUILD_DIR="${ROOT_DIR}/build"
 export INSTALL_DIR="${ROOT_DIR}/install"
