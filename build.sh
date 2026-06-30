@@ -47,6 +47,18 @@ check_tool cargo-cinstall "brew install cargo-c"
 # ---------------------------------------------------------------------------
 # Create directory tree
 # ---------------------------------------------------------------------------
+# On a full build (no package filter), wipe the install prefix for each arch
+# being built so packages can't link against stale artifacts from a previous
+# run (e.g. an old version, or a package since removed from the build list).
+# Scoped per-arch: wiping the whole install/ would destroy the other arch's
+# tree and silently degrade the final lipo_merge to single-arch.
+# Skipped for partial builds, where dependencies must remain in the prefix.
+if [ -z "$PACKAGE_FILTER" ]; then
+    for arch in $ARCHS; do
+        rm -rf "${INSTALL_DIR}/${arch}"
+    done
+fi
+
 mkdir -p "$SOURCES_DIR" "$BUILD_DIR" "$OUTPUT_DIR"
 for arch in $ARCHS; do
     mkdir -p "${INSTALL_DIR}/${arch}"
@@ -76,6 +88,15 @@ _set_title() {
         printf '\033]0;%s\007' "$1" >&2
     fi
 }
+
+# Restore the tmux window name on any exit (success, error, or interrupt),
+# so a failed build doesn't leave the pane stuck on "Compiling ...".
+_restore_title() {
+    if [ -n "${TMUX:-}" ]; then
+        tmux set-window-option automatic-rename on
+    fi
+}
+trap _restore_title EXIT
 
 # run <script> — skips if PACKAGE_FILTER is set and doesn't match the package name
 run() {
@@ -148,10 +169,6 @@ run buildscripts/build-mpv.sh
 # ---------------------------------------------------------------------------
 if [ "$ARCH_FILTER" = "all" ] && [ -z "$PACKAGE_FILTER" ]; then
     bash buildscripts/create-universal.sh
-fi
-
-if [ -n "${TMUX:-}" ]; then
-    tmux set-window-option automatic-rename on
 fi
 
 _ELAPSED=$(( SECONDS - _START_TIME ))

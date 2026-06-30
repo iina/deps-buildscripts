@@ -3,6 +3,7 @@
 This repo holds build scripts that can build the dependencies for IINA. Unlike the old method (https://github.com/iina/homebrew-mpv-iina), we are not depending on Homebrew to compile libraries; brew is only used to download some building tools.
 
 ## Building Tools
+Make sure they are available in PATH, otherwise the script will try to automatically install them from Homebrew.
 - meson
 - ninja
 - cmake
