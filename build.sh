@@ -31,16 +31,16 @@ export ARCHS
 # Check required build tools
 # ---------------------------------------------------------------------------
 check_tool() {
-    command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not found. Install with: $2" >&2; exit 1; }
+    command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not found" >&2; exit 1; }
 }
-check_tool meson      "brew install meson"
-check_tool ninja      "brew install ninja"
-check_tool nasm       "brew install nasm"
-check_tool cmake      "brew install cmake"
-check_tool pkg-config "brew install pkg-config"
-check_tool aclocal    "brew install automake"  # also pulls in autoconf
-check_tool cargo          "brew install rust"
-check_tool cargo-cinstall "brew install cargo-c"
+check_tool meson
+check_tool ninja
+check_tool nasm
+check_tool cmake
+check_tool pkg-config
+check_tool aclocal
+check_tool cargo
+check_tool cargo-cinstall
 
 # ---------------------------------------------------------------------------
 # Create directory tree

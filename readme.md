@@ -5,15 +5,29 @@ This repo holds build scripts that build the dependencies for IINA. Unlike the o
 This build system is only tested on the latest macOS releases. Older versions of macOS might happen to work, but there is no guarantee.
 
 ## Building Tools
-Make sure they are available in PATH, otherwise the script will try to automatically install them from Homebrew.
+Make sure they are installed and available in PATH.
+
 - meson
 - ninja
 - cmake
 - pkg-config
 - automake (also autoconf)
-- rust (for `rav1e`, can be installed via rustup)
+- rust (for `rav1e`, should be installed via rustup)
 - cargo-c (for `rav1e` as well, installed via `cargo install cargo-c`)
 - nasm (for x86 assembly builds, e.g. FFmpeg and dav1d)
+
+Assuming homebrew is installed. To install all:
+
+```bash
+brew install meson ninja pkg-config automake nasm
+```
+
+For rust related tools, they must be installed by `rustup` for cross-compliation support:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+cargo install cargo-c
+```
 
 ## Structure
 All dependencies are divided into 4 layers, which define the order of compilation.
