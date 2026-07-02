@@ -18,7 +18,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew install nasm meson autoconf automake libtool cmake cargo-c
+          brew install nasm meson autoconf automake
 
       - name: Build dependencies
         run: bash build.sh arm64
