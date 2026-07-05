@@ -55,6 +55,10 @@ build_for_arch() {
         --enable-libsoxr \
         --enable-librubberband \
         --enable-libzimg \
+        --enable-libfontconfig \
+        --enable-libfreetype \
+        --enable-libfribidi \
+        --enable-libharfbuzz \
         ${cross_compile_flag:+$cross_compile_flag}
 
     make -j"$JOBS"
