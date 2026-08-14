@@ -19,6 +19,8 @@ build_for_arch() {
     meson_setup "$build_dir" "$SRC_DIR" "$arch" \
         -Dlibmpv=true \
         -Dcplayer=false \
+        -Dcocoa=disabled \
+        -Dswift-build=disabled \
         -Dmacos-cocoa-cb=disabled \
         -Dmacos-touchbar=disabled \
         -Dmacos-media-player=disabled \
