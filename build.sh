@@ -74,22 +74,6 @@ fi
 _PACKAGE_COUNT=0
 _START_TIME=$SECONDS
 
-_set_title() {
-    if [ -n "${TMUX:-}" ]; then
-        tmux rename-window "$1"
-    else
-        printf '\033]0;%s\007' "$1" >&2
-    fi
-}
-
-# Restore the tmux window name on any exit, even a failed/interrupted build.
-_restore_title() {
-    if [ -n "${TMUX:-}" ]; then
-        tmux set-window-option automatic-rename on
-    fi
-}
-trap _restore_title EXIT
-
 # run <script> — skips if PACKAGE_FILTER is set and doesn't match the package name
 run() {
     local script="$1"
@@ -102,12 +86,11 @@ run() {
         esac
     fi
     _PACKAGE_COUNT=$(( _PACKAGE_COUNT + 1 ))
-    _set_title "Compiling ${name} (${_PACKAGE_COUNT}/${_PACKAGE_TOTAL})"
     printf "\n${_BOLD}${_CYAN}╔══ [%d/%d] %s${_RESET}\n" \
         "$_PACKAGE_COUNT" "$_PACKAGE_TOTAL" "$name" >&2
     rm -rf "${BUILD_DIR}/${name}"
     bash "$script"
-    printf "${_BOLD}${_GREEN}╚══ done: %s${_RESET}\n" "$name" >&2
+    printf "${_BOLD}${_GREEN}╚══ done: %s${_RESET}\n\n\n" "$name" >&2
 }
 
 # ---------------------------------------------------------------------------
