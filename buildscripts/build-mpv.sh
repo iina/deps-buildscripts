@@ -19,8 +19,6 @@ build_for_arch() {
     meson_setup "$build_dir" "$SRC_DIR" "$arch" \
         -Dlibmpv=true \
         -Dcplayer=false \
-        -Dcocoa=disabled \
-        -Dswift-build=disabled \
         -Dmacos-cocoa-cb=disabled \
         -Dmacos-touchbar=disabled \
         -Dmacos-media-player=disabled \
@@ -37,6 +35,7 @@ build_for_arch() {
         -Duchardet=enabled \
         -Djpeg=enabled \
         -Drubberband=enabled \
+        -Dswift-flags="-target ${arch}-apple-macosx${MACOSX_DEPLOYMENT_TARGET}"
 
     ninja -C "$build_dir" -j"$JOBS"
     ninja -C "$build_dir" install
