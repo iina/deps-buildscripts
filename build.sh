@@ -115,7 +115,7 @@ run buildscripts/build-libsoxr.sh          # high-quality resampling
 ## encoders
 run buildscripts/build-jpeg-turbo.sh       # provides libjpeg, used by mpv to encode jpeg screenshots
 run buildscripts/build-libwebp.sh          # WebP screenshots
-run buildscripts/build-rav1e.sh            # AV1/AVIF screenshots
+run buildscripts/build-svt-av1.sh          # AV1 encoder for AVIF screenshot
 run buildscripts/build-libjxl.sh           # JPEG XL screenshots; uses bundled brotli, highway, lcms2
 
 ## decoders

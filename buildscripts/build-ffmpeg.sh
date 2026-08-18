@@ -50,7 +50,7 @@ build_for_arch() {
         --enable-libass \
         --enable-libwebp \
         --enable-libjxl \
-        --enable-librav1e \
+        --enable-libsvtav1 \
         --enable-libbs2b \
         --enable-libsoxr \
         --enable-librubberband \

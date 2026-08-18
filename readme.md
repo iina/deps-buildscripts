@@ -12,21 +12,12 @@ Make sure they are installed and available in PATH.
 - cmake
 - pkg-config
 - automake (also autoconf)
-- rust (for `rav1e`, should be installed via rustup)
-- cargo-c (for `rav1e` as well, installed via `cargo install cargo-c`)
 - nasm (for x86 assembly builds, e.g. FFmpeg and dav1d)
 
 Assuming homebrew is installed. To install all:
 
 ```bash
 brew install meson ninja pkg-config automake nasm
-```
-
-For rust related tools, they must be installed by `rustup` for cross-compliation support:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cargo install cargo-c
 ```
 
 ## Structure
