@@ -39,8 +39,6 @@ check_tool nasm
 check_tool cmake
 check_tool pkg-config
 check_tool aclocal
-check_tool cargo
-check_tool cargo-cinstall
 
 # ---------------------------------------------------------------------------
 # Create directory tree
