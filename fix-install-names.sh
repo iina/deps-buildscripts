@@ -25,11 +25,30 @@ esac
 # ── per-arch BFS state (reset at the start of each fix_arch) ──────────────────
 src_dir=""; dest_dir=""
 _seen_file="$(mktemp)"
-trap 'rm -f "$_seen_file"' EXIT
+_soname_map_file="$(mktemp)"
+trap 'rm -f "$_seen_file" "$_soname_map_file"' EXIT
 queue_keys=(); queue_paths=(); _q_idx=0
 
 _mark_seen() { printf '%s\n' "$1" >> "$_seen_file"; }
 _is_seen()   { grep -qFx "$1" "$_seen_file" 2>/dev/null; }
+
+# Maps soname (e.g. libavcodec.63.dylib) -> real file, read from each file's
+# own LC_ID_DYLIB rather than assuming a same-named symlink exists on disk —
+# CI-staged install dirs don't have the soname symlinks, only the real files.
+_build_soname_map() {
+    : > "$_soname_map_file"
+    local f id
+    shopt -s nullglob
+    for f in "$src_dir"/*.dylib; do
+        [ -L "$f" ] && continue
+        id="$(otool -D "$f" 2>/dev/null | tail -n +2)"
+        [ -n "$id" ] || continue
+        printf '%s\t%s\n' "$(basename "$id")" "$f" >> "$_soname_map_file"
+    done
+    shopt -u nullglob
+}
+
+_lookup_soname() { awk -F'\t' -v k="$1" '$1==k{print $2; exit}' "$_soname_map_file"; }
 
 _enqueue() {       # <key> <real_src_path>
     local key="$1" real="$2"
@@ -65,20 +84,20 @@ _fix_one() {
         echo "  rpath  $rpath  (removed)"
     done < <(otool -l "$dest_file" | awk '/cmd LC_RPATH/{f=1} f && /path /{print $2; f=0}')
 
-    local dep dep_base dep_path dep_real
+    local dep dep_base dep_real
     while IFS= read -r dep; do
         [ -z "$dep" ] && continue
         dep_base="$(basename "$dep")"
 
-        dep_path="$src_dir/$dep_base"
-        [ -f "$dep_path" ] || continue      # system / framework lib — skip
+        dep_real="$(_lookup_soname "$dep_base")"
+        [ -n "$dep_real" ] || continue      # system / framework lib — skip
+        dep_real="$(realpath "$dep_real")"
 
         if [ "$dep" != "@rpath/$dep_base" ]; then
             echo "  dep  $dep  →  @rpath/$dep_base"
             install_name_tool -change "$dep" "@rpath/$dep_base" "$dest_file"
         fi
 
-        dep_real="$(realpath "$dep_path")"
         _enqueue "$dep_base" "$dep_real"
     done < <(otool -L "$dest_file" | tail -n +2 | awk '{print $1}')
 }
@@ -101,6 +120,7 @@ fix_arch() {
     # Reset BFS state for this arch.
     : > "$_seen_file"
     queue_keys=(); queue_paths=(); _q_idx=0
+    _build_soname_map
 
     # Find the libmpv entry point.
     shopt -s nullglob

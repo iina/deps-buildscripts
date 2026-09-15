@@ -17,6 +17,10 @@ on:
 env:
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
 
+permissions:
+  contents: read
+  actions: write  # lets the package job delete the intermediate deps-arm64/deps-x86_64 artifacts
+
 jobs:
   # ---------------------------------------------------------------------------
   # Build on Apple Silicon (arm64)
@@ -25,7 +29,7 @@ jobs:
     name: Build (arm64)
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install build tools
         run: |
@@ -60,7 +64,7 @@ jobs:
           done
 
       - name: Upload arm64 artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: deps-arm64
           path: artifacts/
@@ -72,7 +76,7 @@ jobs:
     name: Build (x86_64)
     runs-on: macos-26-intel
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install build tools
         run: |
@@ -107,7 +111,7 @@ jobs:
           done
 
       - name: Upload x86_64 artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: deps-x86_64
           path: artifacts/
@@ -120,16 +124,16 @@ jobs:
     needs: [build-arm64, build-x86_64]
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: deps-arm64
           path: install/arm64/
 
       - name: Download x86_64 artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: deps-x86_64
           path: install/x86_64/
@@ -166,19 +170,30 @@ jobs:
           check_dir output/fat arm64 x86_64
 
       - name: Upload arm64 artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: iina-deps-arm64
           path: output/arm64/
 
       - name: Upload x86_64 artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: iina-deps-x86_64
           path: output/x86_64/
 
       - name: Upload fat (universal) artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: iina-deps-fat
           path: output/fat/
+
+      - name: Delete intermediate build artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --paginate \
+            --jq '.artifacts[] | select(.name == "deps-arm64" or .name == "deps-x86_64") | .id' |
+          while read -r id; do
+            echo "Deleting intermediate artifact id=${id}"
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/${id}"
+          done
