@@ -2,6 +2,17 @@ name: Build IINA Dependencies
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'versions.env'
+      - 'build.sh'
+      - 'buildscripts/**'
+      - 'patches/**'
+      - 'extra/**'
+      - 'fix-install-names.sh'
+      - 'lipo.sh'
+      - '.github/workflows/build.yml'
 
 env:
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
@@ -42,14 +53,10 @@ jobs:
       - name: Stage arm64 artifacts
         run: |
           shopt -s nullglob
-          mkdir -p artifacts/lib artifacts/include
+          mkdir -p artifacts/lib
           for f in install/arm64/lib/*.dylib; do
             [ -L "$f" ] && continue
             cp "$f" artifacts/lib/
-          done
-          [ -d install/arm64/include/mpv ] && cp -r install/arm64/include/mpv artifacts/include/ || true
-          for d in install/arm64/include/libav* install/arm64/include/libsw* install/arm64/include/libpost*; do
-            cp -r "$d" artifacts/include/
           done
 
       - name: Upload arm64 artifacts
@@ -93,14 +100,10 @@ jobs:
       - name: Stage x86_64 artifacts
         run: |
           shopt -s nullglob
-          mkdir -p artifacts/lib artifacts/include
+          mkdir -p artifacts/lib
           for f in install/x86_64/lib/*.dylib; do
             [ -L "$f" ] && continue
             cp "$f" artifacts/lib/
-          done
-          [ -d install/x86_64/include/mpv ] && cp -r install/x86_64/include/mpv artifacts/include/ || true
-          for d in install/x86_64/include/libav* install/x86_64/include/libsw* install/x86_64/include/libpost*; do
-            cp -r "$d" artifacts/include/
           done
 
       - name: Upload x86_64 artifacts
@@ -110,10 +113,10 @@ jobs:
           path: artifacts/
 
   # ---------------------------------------------------------------------------
-  # Combine into universal binaries
+  # Fix install names, lipo into a universal build, and package all 3 variants
   # ---------------------------------------------------------------------------
-  create-universal:
-    name: Create Universal Binaries
+  package:
+    name: Package (arm64 / x86_64 / fat)
     needs: [build-arm64, build-x86_64]
     runs-on: macos-26
     steps:
@@ -131,40 +134,51 @@ jobs:
           name: deps-x86_64
           path: install/x86_64/
 
-      - name: Create universal binaries
-        run: bash buildscripts/create-universal.sh
-
       - name: Fix install names
-        run: bash fix-install-names.sh
+        run: bash fix-install-names.sh all
 
-      - name: Verify universal binaries
+      - name: Create universal binaries
+        run: bash lipo.sh
+
+      - name: Verify per-arch and universal binaries
         run: |
           shopt -s nullglob
-          for f in output/lib/*.dylib; do
-            [ -L "$f" ] && continue
-            echo "--- $(basename "$f") ---"
-            lipo -info "$f"
-            lipo -info "$f" | grep -q "arm64"  || { echo "FAIL: missing arm64";  exit 1; }
-            lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
-            vtool -show-build "$f"
-            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
-          done
+          check_dir() {
+            local dir="$1"; shift
+            local want_archs=("$@")
+            local dylibs=("$dir"/*.dylib)
+            if [ ${#dylibs[@]} -eq 0 ]; then
+              echo "ERROR: No dylibs found in ${dir}" && exit 1
+            fi
+            for f in "${dylibs[@]}"; do
+              [ -L "$f" ] && continue
+              echo "--- ${dir}: $(basename "$f") ---"
+              lipo -info "$f"
+              for a in "${want_archs[@]}"; do
+                lipo -info "$f" | grep -q "$a" || { echo "FAIL: missing ${a} in $(basename "$f")"; exit 1; }
+              done
+              vtool -show-build "$f"
+              vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+            done
+          }
+          check_dir output/arm64 arm64
+          check_dir output/x86_64 x86_64
+          check_dir output/fat arm64 x86_64
 
-      - name: Copy headers to output
-        run: |
-          mkdir -p output/include
-          cp -r install/arm64/include/mpv output/include/ 2>/dev/null || true
-          for d in install/arm64/include/libav* \
-                   install/arm64/include/libsw* \
-                   install/arm64/include/libpost*; do
-            [ -d "$d" ] && cp -r "$d" output/include/
-          done
-
-      - name: Package
-        run: tar czf iina-deps-universal.tar.gz -C output .
-
-      - name: Upload universal artifact
+      - name: Upload arm64 artifact
         uses: actions/upload-artifact@v5
         with:
-          name: iina-deps-universal
-          path: iina-deps-universal.tar.gz
+          name: iina-deps-arm64
+          path: output/arm64/
+
+      - name: Upload x86_64 artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: iina-deps-x86_64
+          path: output/x86_64/
+
+      - name: Upload fat (universal) artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: iina-deps-fat
+          path: output/fat/
