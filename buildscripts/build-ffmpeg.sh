@@ -35,13 +35,14 @@ build_for_arch() {
         --extra-ldflags="${LDFLAGS} -L${prefix}/lib" \
         --pkg-config=pkg-config \
         --enable-gpl \
+        --enable-version3 \
         --enable-shared \
         --disable-static \
         --disable-programs \
         --disable-doc \
         --disable-debug \
         --enable-network \
-        --enable-securetransport \
+        --enable-openssl \
         --enable-videotoolbox \
         --enable-audiotoolbox \
         --enable-libspeex \

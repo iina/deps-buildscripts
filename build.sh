@@ -38,6 +38,7 @@ check_tool ninja
 check_tool nasm
 check_tool cmake
 check_tool pkg-config
+check_tool perl
 check_tool aclocal
 
 # ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ run buildscripts/build-libudfread.sh       # UDF filesystem reader required by l
 run buildscripts/build-lz4.sh              # compression algorithm used by libarchive
 run buildscripts/build-zstd.sh             # compression algorithm used by libarchive
 run buildscripts/build-zimg.sh             # image scaling algorithm used by mpv's zscale filter
+run buildscripts/build-openssl.sh          # TLS backend for FFmpeg (https, including TLS 1.3); linked statically
 run buildscripts/build-libbs2b.sh          # binaural audio filter
 run buildscripts/build-libsoxr.sh          # high-quality resampling
 
