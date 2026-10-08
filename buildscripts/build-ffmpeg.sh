@@ -48,6 +48,7 @@ build_for_arch() {
         --enable-libvorbis \
         --enable-libdav1d \
         --enable-libass \
+        --enable-libaribcaption \
         --enable-libwebp \
         --enable-libjxl \
         --enable-libsvtav1 \

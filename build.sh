@@ -121,6 +121,7 @@ run buildscripts/build-dav1d.sh            # AV1 decoder
 run buildscripts/build-speex.sh            # Speex audio format decoding support
 run buildscripts/build-libogg.sh           # base library for Ogg bitstream format
 run buildscripts/build-libvorbis.sh        # Ogg Vorbis audio decoder; depends on libogg
+run buildscripts/build-libaribcaption.sh   # ARIB STD-B24 caption decoder (Japanese broadcast subtitles); uses CoreText
 
 # --- Layer 2: Libraries with Layer 1 dependencies ---
 run buildscripts/build-harfbuzz.sh         # text shaping engine; depends on freetype

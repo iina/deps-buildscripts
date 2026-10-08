@@ -41,6 +41,7 @@ jobs:
       - name: Verify arm64 libraries
         run: |
           shopt -s nullglob
+          source buildscripts/common.sh
           dylibs=(install/arm64/lib/*.dylib)
           if [ ${#dylibs[@]} -eq 0 ]; then
             echo "ERROR: No dylibs found in install/arm64/lib/" && exit 1
@@ -51,7 +52,7 @@ jobs:
             lipo -info "$f"
             lipo -info "$f" | grep -q "arm64" || { echo "FAIL: missing arm64"; exit 1; }
             vtool -show-build "$f"
-            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+            vtool -show-build "$f" | grep -q "minos ${MACOSX_DEPLOYMENT_TARGET}" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
           done
 
       - name: Stage arm64 artifacts
@@ -88,6 +89,7 @@ jobs:
       - name: Verify x86_64 libraries
         run: |
           shopt -s nullglob
+          source buildscripts/common.sh
           dylibs=(install/x86_64/lib/*.dylib)
           if [ ${#dylibs[@]} -eq 0 ]; then
             echo "ERROR: No dylibs found in install/x86_64/lib/" && exit 1
@@ -98,7 +100,7 @@ jobs:
             lipo -info "$f"
             lipo -info "$f" | grep -q "x86_64" || { echo "FAIL: missing x86_64"; exit 1; }
             vtool -show-build "$f"
-            vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+            vtool -show-build "$f" | grep -q "minos ${MACOSX_DEPLOYMENT_TARGET}" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
           done
 
       - name: Stage x86_64 artifacts
@@ -147,6 +149,7 @@ jobs:
       - name: Verify per-arch and universal binaries
         run: |
           shopt -s nullglob
+          source buildscripts/common.sh
           check_dir() {
             local dir="$1"; shift
             local want_archs=("$@")
@@ -162,7 +165,7 @@ jobs:
                 lipo -info "$f" | grep -q "$a" || { echo "FAIL: missing ${a} in $(basename "$f")"; exit 1; }
               done
               vtool -show-build "$f"
-              vtool -show-build "$f" | grep -q "minos 11.0" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
+              vtool -show-build "$f" | grep -q "minos ${MACOSX_DEPLOYMENT_TARGET}" || { echo "FAIL: wrong minos in $(basename "$f")"; exit 1; }
             done
           }
           check_dir output/arm64 arm64

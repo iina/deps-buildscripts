@@ -1,0 +1,29 @@
+# Meson machine file template for macOS.
+# meson_setup() in buildscripts/common.sh fills in the @...@ placeholders and
+# writes the result to build/meson-<arch>-darwin.ini. It is passed as
+# --native-file when building for the host arch, or --cross-file otherwise.
+
+[binaries]
+c         = 'clang'
+cpp       = 'clang++'
+objc      = 'clang'
+objcpp    = 'clang++'
+ar        = 'ar'
+strip     = 'strip'
+pkg-config = 'pkg-config'
+
+[built-in options]
+c_args        = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+c_link_args   = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+cpp_args      = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+cpp_link_args = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+objc_args      = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+objc_link_args = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+objcpp_args      = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+objcpp_link_args = ['-arch', '@ARCH@', '-mmacosx-version-min=@MACOSX_DEPLOYMENT_TARGET@']
+
+[host_machine]
+system     = 'darwin'
+cpu_family = '@CPU_FAMILY@'
+cpu        = '@CPU_FAMILY@'
+endian     = 'little'

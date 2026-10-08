@@ -4,7 +4,7 @@
 _COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export ROOT_DIR="$(cd "${_COMMON_DIR}/.." && pwd)"
-export MACOSX_DEPLOYMENT_TARGET="11.0"
+export MACOSX_DEPLOYMENT_TARGET="12.0"
 export ARCHS="${ARCHS:-arm64 x86_64}"
 export SOURCES_DIR="${ROOT_DIR}/sources"
 export BUILD_DIR="${ROOT_DIR}/build"
@@ -180,6 +180,26 @@ setup_arch_env() {
 # Meson build helper
 # ---------------------------------------------------------------------------
 
+# generate_meson_machine_file <arch>  →  path to the generated machine file
+# Fills in extra/meson-darwin.ini.in for <arch> and MACOSX_DEPLOYMENT_TARGET.
+generate_meson_machine_file() {
+    local arch="$1"
+    local cpu_family
+    case "$arch" in
+        arm64)  cpu_family="aarch64" ;;
+        x86_64) cpu_family="x86_64"  ;;
+        *) echo "ERROR: Unknown arch: $arch" >&2; exit 1 ;;
+    esac
+
+    local machine_file="${BUILD_DIR}/meson-${arch}-darwin.ini"
+    mkdir -p "$BUILD_DIR"
+    sed -e "s/@ARCH@/${arch}/g" \
+        -e "s/@CPU_FAMILY@/${cpu_family}/g" \
+        -e "s/@MACOSX_DEPLOYMENT_TARGET@/${MACOSX_DEPLOYMENT_TARGET}/g" \
+        "${ROOT_DIR}/extra/meson-darwin.ini.in" > "$machine_file"
+    echo "$machine_file"
+}
+
 # meson_setup <build_dir> <src_dir> <arch> [extra meson args...]
 # Selects --native-file vs --cross-file based on whether arch == host arch,
 # clears CFLAGS/LDFLAGS so they don't duplicate the machine-file c_args,
@@ -189,7 +209,8 @@ meson_setup() {
     shift 3
     local prefix
     prefix="$(get_prefix "$arch")"
-    local machine_file="${ROOT_DIR}/extra/meson-${arch}-darwin.ini"
+    local machine_file
+    machine_file="$(generate_meson_machine_file "$arch")"
     local native_arch
     native_arch="$(uname -m)"
 
