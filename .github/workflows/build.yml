@@ -13,6 +13,21 @@ on:
       - 'fix-install-names.sh'
       - 'lipo.sh'
       - '.github/workflows/build.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'versions.env'
+      - 'build.sh'
+      - 'buildscripts/**'
+      - 'patches/**'
+      - 'extra/**'
+      - 'fix-install-names.sh'
+      - 'lipo.sh'
+      - '.github/workflows/build.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
@@ -191,6 +206,8 @@ jobs:
           path: output/fat/
 
       - name: Delete intermediate build artifacts
+        # PRs from forks get a read-only token, so they can't delete artifacts
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
