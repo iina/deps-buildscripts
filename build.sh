@@ -130,6 +130,7 @@ run buildscripts/build-harfbuzz.sh         # text shaping engine; depends on fre
 run buildscripts/build-fontconfig.sh       # font configuration and matching; depends on freetype
 run buildscripts/build-libarchive.sh       # reading archive files used by mpv; depends on lz4, zstd
 run buildscripts/build-rubberband.sh       # audio pitch/tempo, used by both mpv and FFmpeg
+run buildscripts/build-libssh.sh           # SSH/SFTP client for FFmpeg's sftp:// protocol; depends on openssl
 
 # --- Layer 3: Core media libraries ---
 run buildscripts/build-libbluray.sh        # depends on fontconfig, freetype, libudfread

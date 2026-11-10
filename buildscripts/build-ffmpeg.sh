@@ -43,6 +43,7 @@ build_for_arch() {
         --disable-debug \
         --enable-network \
         --enable-openssl \
+        --enable-libssh \
         --enable-videotoolbox \
         --enable-audiotoolbox \
         --enable-libspeex \
