@@ -1,0 +1,35 @@
+From f1072ec214f0db7b178ff96724b5dfceeb64c8fa Mon Sep 17 00:00:00 2001
+From: low-batt <86170219+low-batt@users.noreply.github.com>
+Date: Wed, 11 Nov 2026 19:32:13 -0500
+Subject: [PATCH] mac/view: fix a libmpv build failure under macOS with Vulkan
+ disabled
+
+Clients using the render API are unable to use Metal, so libmpv builds
+may not include Vulkan. View was changed to reference MetalLayer which
+is not present when building without Vulkan causing libmpv builds to
+fail.
+
+In View.isOpaque cast to CAMetalLayer instead of MetalLayer to remove
+the reference to the potentially missing MetalLayer class.
+
+introduced in PR #17173
+commit beddaec
+
+Fixes #18817
+---
+ video/out/mac/view.swift | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/video/out/mac/view.swift b/video/out/mac/view.swift
+index f8cc6254ae975..0f5c18a3e72c2 100644
+--- a/video/out/mac/view.swift
++++ b/video/out/mac/view.swift
+@@ -29,7 +29,7 @@ class View: NSView, CALayerDelegate {
+     override var acceptsFirstResponder: Bool { return true }
+ 
+     override var isOpaque: Bool {
+-        if let metalLayer = layer as? MetalLayer {
++        if let metalLayer = layer as? CAMetalLayer {
+             return !metalLayer.isOpaque
+         }
+ 
