@@ -1,0 +1,77 @@
+From acc4550a0ce91291a0b7e3cdac932df01c5ed5aa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Kacper=20Michaj=C5=82ow?= <kasper93@gmail.com>
+Date: Thu, 5 Nov 2026 15:04:05 +0100
+Subject: [PATCH 1/2] vd_lavc: delay hwaccel frames before passing them on
+
+libavcodec returns a hwaccel frame while the GPU is still decoding it.
+We directly pass it to VO which then stalls waiting on those frames to
+be ready. Even though decoder and rendering is a lot faster than what's
+needed to smooth playback, this can stall whole pipeline and we drop
+frames.
+
+Fixes lower than expected hwdec performance with heavier to decode
+files.
+---
+ video/decode/vd_lavc.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/video/decode/vd_lavc.c b/video/decode/vd_lavc.c
+index 2eb9933363600..7432076043314 100644
+--- a/video/decode/vd_lavc.c
++++ b/video/decode/vd_lavc.c
+@@ -799,9 +799,12 @@ static void init_avctx(struct mp_filter *vd)
+         if (ctx->hwdec.pix_fmt != AV_PIX_FMT_NONE)
+             avctx->get_format = get_format_hwdec;
+ 
+-        // Some APIs benefit from this, for others it's additional bloat.
+-        if (ctx->hwdec.copying)
++        // Allow decoder to finish decoding before the frames are passed to the
++        // renderer.
++        if (ctx->hwdec.copying || ctx->hwdec.use_hw_frames)
+             ctx->max_delay_queue = HWDEC_DELAY_QUEUE_COUNT;
++        if (ctx->max_delay_queue && !ctx->hwdec.use_hw_frames)
++            avctx->extra_hw_frames = ctx->max_delay_queue;
+         ctx->hw_probing = true;
+ 
+         threads = ctx->hwdec_opts->hwdec_threads;
+@@ -956,9 +959,8 @@ static void uninit_avctx(struct mp_filter *vd)
+ // on to at any given time.
+ static int hwdec_get_extra_frames(vd_ffmpeg_ctx *ctx)
+ {
+-    // Structural surface requirement of the player (e.g. the enhancement-layer
+-    // pairing queue); applies on top of any user override.
+-    int hint = ctx->extra_hw_frames_hint;
++    // Surface requirement of the player + decoder queue.
++    int hint = ctx->extra_hw_frames_hint + ctx->max_delay_queue;
+ 
+     int extra = ctx->hwdec_opts->hwdec_extra_frames;
+     if (extra >= 0)
+
+From 7ae7011de8a77e098899c1cd97a4d4ede0809ae2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Kacper=20Michaj=C5=82ow?= <kasper93@gmail.com>
+Date: Thu, 5 Nov 2026 15:38:04 +0100
+Subject: [PATCH 2/2] vd_lavc: hold back 4 hardware decoded frames instead of 2
+
+With 2 frames, 31 Mbps 4K AV1 at 2x speed still was dropping frames.
+Make the queue 4, which nicelly hides decoder latency.
+
+Note that the main issue comes from that not every frame is decoded in
+the same time for those AV1 samples, so we need to eat the latency
+spikes. And also it's good for pipelining with rendering.
+---
+ video/decode/vd_lavc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/video/decode/vd_lavc.c b/video/decode/vd_lavc.c
+index 7432076043314..a1834e240a157 100644
+--- a/video/decode/vd_lavc.c
++++ b/video/decode/vd_lavc.c
+@@ -65,7 +65,7 @@ static enum AVPixelFormat get_format_hwdec(struct AVCodecContext *avctx,
+ static int hwdec_opt_help(struct mp_log *log, const m_option_t *opt,
+                           struct bstr name);
+ 
+-#define HWDEC_DELAY_QUEUE_COUNT 2
++#define HWDEC_DELAY_QUEUE_COUNT 4
+ #define HWDEC_WAIT_KEYFRAME_COUNT 96
+ 
+ // Fallback number of extra surfaces for fixed-size hw frame pools, if the
