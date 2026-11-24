@@ -111,6 +111,7 @@ run buildscripts/build-zimg.sh             # image scaling algorithm used by mpv
 run buildscripts/build-openssl.sh          # TLS backend for FFmpeg (https, including TLS 1.3); linked statically
 run buildscripts/build-libbs2b.sh          # binaural audio filter
 run buildscripts/build-libsoxr.sh          # high-quality resampling
+run buildscripts/build-shaderc.sh          # Shader compiler used by libplacebo
 
 ## encoders
 run buildscripts/build-jpeg-turbo.sh       # provides libjpeg, used by mpv to encode jpeg screenshots
@@ -134,7 +135,7 @@ run buildscripts/build-libssh.sh           # SSH/SFTP client for FFmpeg's sftp:/
 
 # --- Layer 3: Core media libraries ---
 run buildscripts/build-libbluray.sh        # depends on fontconfig, freetype, libudfread
-run buildscripts/build-libplacebo.sh       # depends on little-cms2
+run buildscripts/build-libplacebo.sh       # depends on little-cms2, shaderc
 run buildscripts/build-libass.sh           # depends on freetype, fribidi, harfbuzz, fontconfig, libunibreak
 run buildscripts/build-ffmpeg.sh           # depends on all Layer 1+2 libs above
 

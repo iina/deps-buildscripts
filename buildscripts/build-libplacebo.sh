@@ -3,19 +3,34 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 DEP_NAME="libplacebo"
+COMMIT="${LIBPLACEBO_COMMIT}"
 VERSION="${LIBPLACEBO_VERSION}"
-SRC_DIR="${SOURCES_DIR}/${DEP_NAME}-${VERSION}"
-
+SRC_DIR="${SOURCES_DIR}/${DEP_NAME}"
+if [ -n "${COMMIT}" ]; then
+  SRC_DIR="${SRC_DIR}-${COMMIT}"
+else
+  SRC_DIR="${SRC_DIR}-${VERSION}"
+fi
 # Use a recursive clone so the glad2 submodule (needed for OpenGL) is included.
 # A tarball from GitLab /-/archive/ does not bundle submodules.
 clone_source() {
     if [ -d "$SRC_DIR" ]; then
+      if [ -n "${COMMIT}" ]; then
+        log_step "Already cloned: ${DEP_NAME} @ ${COMMIT}"
+      else
         log_step "Already cloned: ${DEP_NAME} v${VERSION}"
-        return 0
+      fi
+      return 0
     fi
-    log_step "Cloning: ${DEP_NAME} v${VERSION}"
+    if [ -n "$COMMIT" ]; then
+      CHECKOUT="--revision ${COMMIT}"
+      log_step "Cloning: ${DEP_NAME} @ ${COMMIT}"
+    else
+      CHECKOUT="--branch v${VERSION}"
+      log_step "Cloning: ${DEP_NAME} v${VERSION}"
+    fi
     git clone --recurse-submodules --depth 1 \
-        --branch "v${VERSION}" \
+        ${CHECKOUT} \
         "${LIBPLACEBO_REPO}" \
         "$SRC_DIR"
 }
@@ -34,7 +49,7 @@ build_for_arch() {
         -Dd3d11=disabled \
         -Ddemos=false \
         -Dtests=false \
-        -Dshaderc=disabled \
+        -Dshaderc=enabled \
         -Dglslang=disabled \
         -Dlcms=enabled
 
