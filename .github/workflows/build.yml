@@ -137,7 +137,7 @@ jobs:
   # Fix install names, lipo into a universal build, and package all 3 variants
   # ---------------------------------------------------------------------------
   package:
-    name: Package (arm64 / x86_64 / fat)
+    name: Package (arm64 / x86_64 / universal)
     needs: [build-arm64, build-x86_64]
     runs-on: macos-26
     steps:
@@ -185,7 +185,7 @@ jobs:
           }
           check_dir output/arm64 arm64
           check_dir output/x86_64 x86_64
-          check_dir output/fat arm64 x86_64
+          check_dir output/universal arm64 x86_64
 
       - name: Upload arm64 artifact
         uses: actions/upload-artifact@v7
@@ -199,11 +199,11 @@ jobs:
           name: iina-deps-x86_64
           path: output/x86_64/
 
-      - name: Upload fat (universal) artifact
+      - name: Upload universal artifact
         uses: actions/upload-artifact@v7
         with:
-          name: iina-deps-fat
-          path: output/fat/
+          name: iina-deps-universal
+          path: output/universal/
 
       - name: Delete intermediate build artifacts
         # PRs from forks get a read-only token, so they can't delete artifacts

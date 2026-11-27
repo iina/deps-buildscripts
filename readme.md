@@ -50,7 +50,7 @@ After installing all dependencies, we should fix their install names before crea
 ./fix-install-names.sh all     # Default
 ```
 
-Use `lipo.sh` to create universal binaries. This script will find all `dylibs` in `output/arm64/` and `output/x86_64` and `lipo` them into `output/fat`. An ad-hoc sign will also be performed after lipo'ing.
+Use `lipo.sh` to create universal binaries. This script will find all `dylibs` in `output/arm64/` and `output/x86_64` and `lipo` them into `output/universal`. An ad-hoc sign will also be performed after lipo'ing.
 
 ```bash
 ./lipo.sh

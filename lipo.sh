@@ -11,7 +11,7 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 arm_dir="${1:-${ROOT_DIR}/output/arm64}"
 x86_dir="${2:-${ROOT_DIR}/output/x86_64}"
-out_dir="${3:-${ROOT_DIR}/output/fat}"
+out_dir="${3:-${ROOT_DIR}/output/universal}"
 
 mkdir -p "$out_dir"
 
